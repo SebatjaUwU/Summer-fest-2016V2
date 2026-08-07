@@ -120,9 +120,14 @@
   .merch-link:hover{ border-color:rgba(249,178,51,0.5); background: rgba(249,178,51,0.08); }
   .merch-link svg{ width:15px; height:15px; }
 
-  /* ---------- DISCO GIRATORIO ---------- */
-  .disco-wrap{ display:flex; flex-direction:column; align-items:center; padding:20px 0 8px; }
-  .disco-stage{ position:relative; width:min(240px, 55vw); height:min(240px, 55vw); }
+  /* ---------- DISCO GIRATORIO + SPOTIFY ---------- */
+  .disco-wrap{
+    display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
+    gap:26px; padding:20px 0 40px;
+  }
+  .disco-stage{ position:relative; width:min(220px, 55vw); height:min(220px, 55vw); flex:none; }
+  .player-col{ display:flex; flex-direction:column; gap:14px; width:100%; max-width:300px; }
+  #spotify-embed iframe{ border-radius:12px; }
 
   .tonearm{
     position:absolute; top:-14px; right:6%; width:12px; height:96px;
@@ -166,36 +171,6 @@
   @keyframes dotPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(34,211,122,0.5); } 50%{ box-shadow:0 0 0 6px rgba(34,211,122,0); } }
   .disco-caption span{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cream-dim); }
 
-  /* ---------- CONTROL DE VOLUMEN ---------- */
-  .volume{
-    margin:6px 0 70px; padding:20px 26px; border-radius:100px; border:1px solid var(--line);
-    background: rgba(245,239,217,0.03);
-    display:flex; align-items:center; gap:16px; max-width:360px; margin-left:auto; margin-right:auto;
-  }
-  .volume svg{ width:18px; height:18px; color:var(--cream-dim); flex:none; }
-  .volume input[type="range"]{
-    -webkit-appearance:none; appearance:none; flex:1; height:4px; border-radius:100px;
-    background: linear-gradient(90deg, var(--green), var(--blue) 60%, var(--line) 60%);
-    outline:none; cursor:pointer;
-  }
-  .volume input[type="range"]::-webkit-slider-thumb{
-    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
-    background: var(--cream); border:2px solid var(--night); cursor:pointer;
-  }
-  .volume input[type="range"]::-moz-range-thumb{
-    width:16px; height:16px; border-radius:50%;
-    background: var(--cream); border:2px solid var(--night); cursor:pointer;
-  }
-
-  /* Reproductor de Spotify: sigue sonando, solo que oculto visualmente.
-     Importante: NO se puede achicar a 1x1px (clip) porque el embed de Spotify
-     necesita un tamaño real renderizado para inicializar el player; si no,
-     el controller nunca queda listo y ni el disco ni el volumen funcionan. */
-  .visually-hidden{
-    position:absolute; left:-9999px; top:0;
-    width:300px; height:152px; opacity:0; pointer-events:none;
-  }
-
   footer{ text-align:center; padding:20px 0 50px; font-size:12px; color:var(--cream-dim); }
 </style>
 </head>
@@ -222,7 +197,10 @@
         <div class="tonearm"></div>
         <div class="vinyl"></div>
       </div>
-      <div class="disco-caption"><span class="dot"></span><span>Sonando ahora · playlist oficial</span></div>
+      <div class="player-col">
+        <div class="disco-caption"><span class="dot"></span><span>Sonando ahora · playlist oficial</span></div>
+        <div id="spotify-embed"></div>
+      </div>
     </div>
 
     <nav class="events">
@@ -252,13 +230,6 @@
       Ver merch
     </a>
 
-    <div class="volume">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
-      <input type="range" id="volumeSlider" min="0" max="100" value="60" aria-label="Volumen">
-    </div>
-
-    <div id="spotify-embed" class="visually-hidden"></div>
-
     <footer>END OF SUMMER — Fan Tribute · Bogotá</footer>
   </div>
 
@@ -277,7 +248,6 @@
       };
       IFrameAPI.createController(element, options, (controller) => {
         spotifyController = controller;
-        controller.setVolume(Number(volumeSlider.value) / 100);
         // el disco solo gira cuando la playlist realmente está sonando
         controller.addListener('playback_update', (e) => {
           discoStage.classList.toggle('is-playing', !e.data.isPaused);
@@ -287,7 +257,6 @@
 
     const gate = document.getElementById('gate');
     const enterBtn = document.getElementById('enterBtn');
-    const volumeSlider = document.getElementById('volumeSlider');
 
     enterBtn.addEventListener('click', () => {
       gate.classList.add('is-hidden');
@@ -295,14 +264,6 @@
         spotifyController.play();
       }
     }, { once: true });
-
-    volumeSlider.addEventListener('input', () => {
-      const pct = volumeSlider.value;
-      volumeSlider.style.background = `linear-gradient(90deg, var(--green), var(--blue) ${pct}%, var(--line) ${pct}%)`;
-      if (spotifyController) {
-        spotifyController.setVolume(Number(pct) / 100);
-      }
-    });
   </script>
   <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 
