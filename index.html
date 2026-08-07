@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>END OF SUMMER — Eventos</title>
+<meta name="description" content="END OF SUMMER — Fan Tribute. Elige tu fecha: 5 de septiembre o 4 de septiembre, Teatro Republik, Bogotá.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night: #070E17;
+    --night-2: #0A1F17;
+    --sun: #FF6A2B;
+    --sun-soft: #FF8A50;
+    --horizon-blue: #1FA6E0;
+    --dusk-pink: #E8368F;
+    --dusk-purple: #9B5DE5;
+    --dusk-gold: #F9B233;
+    --blue: #2E6FF2;
+    --green: #22D37A;
+    --cream: #F5EFD9;
+    --cream-dim: #C9C2B2;
+    --line: rgba(245,239,217,0.14);
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    background: radial-gradient(120% 100% at 50% 0%, var(--night-2) 0%, var(--night) 55%);
+    color: var(--cream);
+    font-family:'Space Grotesk', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* ---------- ENTRY GATE (click to enter + start music) ---------- */
+  .gate{
+    position:fixed; inset:0; z-index:100;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+    background: radial-gradient(120% 100% at 50% 0%, var(--night-2) 0%, var(--night) 60%);
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+  }
+  .gate.is-hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+  .gate-title{
+    font-family:'Unbounded', sans-serif; font-weight:900;
+    font-size: clamp(28px, 7vw, 52px);
+    text-align:center;
+    background: linear-gradient(90deg, var(--sun), var(--dusk-pink), var(--blue), var(--green));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .gate-sub{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; color:var(--cream-dim); text-transform:uppercase; }
+  .gate-btn{
+    font-family:'JetBrains Mono', monospace; font-size:13px; letter-spacing:0.08em; text-transform:uppercase;
+    padding:16px 34px; border-radius:100px; border:1px solid var(--line);
+    background: rgba(245,239,217,0.06); color:var(--cream); cursor:pointer;
+    display:flex; align-items:center; gap:10px;
+    animation: pulseBtn 1.8s ease-in-out infinite;
+  }
+  .gate-btn:hover{ background: rgba(245,239,217,0.12); }
+  .gate-btn svg{ width:16px; height:16px; }
+  @keyframes pulseBtn{
+    0%,100%{ box-shadow:0 0 0 0 rgba(245,239,217,0.15); }
+    50%{ box-shadow:0 0 0 12px rgba(245,239,217,0); }
+  }
+
+  /* ---------- MAIN ---------- */
+  .wrap{ max-width:1000px; margin:0 auto; padding:0 24px; }
+
+  header.top{ padding:64px 0 20px; text-align:center; }
+  .brand{
+    font-family:'Unbounded', sans-serif; font-weight:900; font-size:clamp(30px,6vw,46px);
+    color:var(--cream);
+  }
+  .brand-tagline{ margin-top:8px; font-size:14px; color:var(--cream-dim); }
+
+  nav.events{
+    display:grid; grid-template-columns:1fr 1fr; gap:22px;
+    padding:40px 0 30px;
+  }
+  @media (max-width:640px){ nav.events{ grid-template-columns:1fr; } }
+
+  .event-card{
+    position:relative; display:block; text-decoration:none; color:var(--cream);
+    border-radius:20px; padding:30px 26px; border:1px solid var(--line);
+    background: rgba(245,239,217,0.03);
+    transition: transform 0.35s cubic-bezier(.2,.8,.2,1), border-color 0.35s ease, box-shadow 0.35s ease;
+  }
+  .event-card:hover{ transform:translateY(-6px); }
+  .event-card--one{ border-color:rgba(255,106,43,0.3); }
+  .event-card--one:hover{ box-shadow:0 20px 50px rgba(255,106,43,0.16); border-color:rgba(255,106,43,0.5); }
+  .event-card--two{ border-color:rgba(34,211,122,0.3); }
+  .event-card--two:hover{ box-shadow:0 20px 50px rgba(34,211,122,0.16); border-color:rgba(34,211,122,0.5); }
+
+  .event-tag{
+    display:inline-block; font-family:'JetBrains Mono', monospace; font-size:10.5px;
+    letter-spacing:0.1em; text-transform:uppercase; padding:5px 12px; border-radius:100px;
+    margin-bottom:16px;
+  }
+  .event-card--one .event-tag{ background:rgba(255,106,43,0.14); border:1px solid rgba(255,106,43,0.4); color:var(--sun-soft); }
+  .event-card--two .event-tag{ background:rgba(34,211,122,0.14); border:1px solid rgba(34,211,122,0.4); color:var(--green); }
+
+  .event-title{ font-family:'Unbounded', sans-serif; font-weight:800; font-size:22px; margin-bottom:6px; }
+  .event-date{ font-size:14px; color:var(--cream-dim); margin-bottom:18px; }
+  .event-cta{
+    display:inline-flex; align-items:center; gap:8px; font-family:'JetBrains Mono', monospace;
+    font-size:11.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--cream);
+  }
+  .event-cta svg{ width:14px; height:14px; transition: transform 0.25s ease; }
+  .event-card:hover .event-cta svg{ transform:translateX(4px); }
+
+  /* ---------- SPOTIFY PLAYER ---------- */
+  .music{
+    margin:10px 0 70px; padding:24px; border-radius:20px; border:1px solid var(--line);
+    background: rgba(245,239,217,0.03);
+  }
+  .music-head{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .music-head .dot{ width:8px; height:8px; border-radius:50%; background:var(--green); animation: dotPulse 1.1s ease-in-out infinite; }
+  @keyframes dotPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(34,211,122,0.5); } 50%{ box-shadow:0 0 0 6px rgba(34,211,122,0); } }
+  .music-head span{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cream-dim); }
+  #spotify-embed iframe{ border-radius:12px; }
+
+  footer{ text-align:center; padding:20px 0 50px; font-size:12px; color:var(--cream-dim); }
+</style>
+</head>
+<body>
+
+  <!-- ENTRY GATE: se necesita un clic real del usuario para poder arrancar el audio de Spotify (los navegadores bloquean el autoplay sin interacción) -->
+  <div class="gate" id="gate">
+    <div class="gate-title">END OF SUMMER</div>
+    <div class="gate-sub">Fan Tribute · Dos fechas, un mismo verano</div>
+    <button class="gate-btn" id="enterBtn" type="button">
+      Toca para entrar
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">END OF SUMMER</div>
+      <div class="brand-tagline">Fan Tribute — elige la fecha a la que vas</div>
+    </header>
+
+    <nav class="events">
+      <a class="event-card event-card--one" href="eventos/summer-2016.html">
+        <div class="event-tag">Primera fecha</div>
+        <div class="event-title">END OF SUMMER — Fan Tribute</div>
+        <div class="event-date">Viernes 5 de septiembre · Teatro Republik, Bogotá</div>
+        <div class="event-cta">
+          Ver entradas
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a class="event-card event-card--two" href="eventos/end-of-summer-2.html">
+        <div class="event-tag">Segunda fecha</div>
+        <div class="event-title">END OF SUMMER 2016</div>
+        <div class="event-date">Viernes 4 de septiembre · Teatro Republik, Bogotá</div>
+        <div class="event-cta">
+          Ver entradas
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </div>
+      </a>
+    </nav>
+
+    <div class="music">
+      <div class="music-head"><span class="dot"></span><span>Sonando ahora · playlist oficial</span></div>
+      <div id="spotify-embed"></div>
+    </div>
+
+    <footer>END OF SUMMER — Fan Tribute · Bogotá</footer>
+  </div>
+
+  <script>
+    /*
+      PLAYLIST DE SPOTIFY
+      -------------------
+      Este es un PLACEHOLDER (playlist pública "Today's Top Hits" de Spotify).
+      Reemplaza PLAYLIST_ID por el ID de tu playlist real cuando la tengas.
+      El ID es la parte de la URL después de /playlist/ en open.spotify.com/playlist/XXXXXXXX
+    */
+    const PLAYLIST_ID = '37i9dQZF1DXcBWIGoYBM5M';
+
+    let spotifyController = null;
+
+    window.onSpotifyIframeApiReady = (IFrameAPI) => {
+      const element = document.getElementById('spotify-embed');
+      const options = {
+        uri: 'spotify:playlist:' + PLAYLIST_ID,
+        width: '100%',
+        height: '152'
+      };
+      IFrameAPI.createController(element, options, (controller) => {
+        spotifyController = controller;
+      });
+    };
+
+    const gate = document.getElementById('gate');
+    const enterBtn = document.getElementById('enterBtn');
+
+    enterBtn.addEventListener('click', () => {
+      gate.classList.add('is-hidden');
+      if (spotifyController) {
+        spotifyController.play();
+      }
+    }, { once: true });
+  </script>
+  <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
+
+</body>
+</html>
