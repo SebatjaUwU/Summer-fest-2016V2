@@ -226,29 +226,45 @@
 
   /* ---------- LINEUP ---------- */
   .lineup{ padding: 100px 0 100px; }
-  .lineup-grid{
-    display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:16px;
-    max-width:820px; margin:0 auto;
+
+  .lineup-cloud{
+    max-width:700px; margin:0 auto; display:flex; flex-wrap:wrap;
+    justify-content:center; align-items:baseline; gap:16px 24px; text-align:center;
   }
-  .lineup-slot{
-    border:1px solid var(--line); border-radius:16px; padding:28px 18px; text-align:center;
-    background: linear-gradient(165deg, rgba(34,211,122,0.05), rgba(46,111,242,0.03));
-    opacity:0; transform:translateY(16px); transition: opacity 0.5s ease, transform 0.5s ease, border-color 0.3s ease;
+  .lineup-cloud span{
+    display:inline-block; opacity:0; transform:translateY(14px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
   }
-  .lineup-slot.in-view{ opacity:1; transform:translateY(0); }
-  .lineup-slot:hover{ border-color: rgba(34,211,122,0.4); }
-  .lineup-slot .tag{
-    font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;
-    color: var(--green); margin-bottom:10px;
-  }
-  .lineup-slot .mark{
-    font-family:'Unbounded', sans-serif; font-weight:800; font-size:17px;
-    background: linear-gradient(90deg, var(--green), var(--blue));
+  .lineup-cloud.in-view span{ opacity:1; transform:translateY(0); }
+
+  .lineup-cloud .t1{
+    font-family:'Unbounded', sans-serif; font-weight:800; font-size: clamp(30px, 5.4vw, 46px); line-height:1.15;
+    background: linear-gradient(90deg, var(--gold) 0%, var(--pink) 55%, var(--purple) 100%);
     -webkit-background-clip:text; background-clip:text; color:transparent;
   }
-  .lineup-slot.intl .mark{ background: linear-gradient(90deg, var(--gold), var(--pink)); -webkit-background-clip:text; background-clip:text; }
-  .lineup-slot.intl .tag{ color: var(--gold); }
-  .lineup-note{ text-align:center; margin-top:26px; font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--cream-dim); }
+  .lineup-cloud .t2{
+    font-family:'Unbounded', sans-serif; font-weight:700; font-size: clamp(22px, 3.6vw, 30px);
+    background: linear-gradient(90deg, var(--purple), var(--blue));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .lineup-cloud .t3{ font-family:'Space Grotesk', sans-serif; font-weight:600; font-size: clamp(16px, 2.4vw, 19px); }
+  .lineup-cloud .t3:nth-child(4n+1){ color: var(--gold); }
+  .lineup-cloud .t3:nth-child(4n+2){ color: var(--pink); }
+  .lineup-cloud .t3:nth-child(4n+3){ color: var(--purple); }
+  .lineup-cloud .t3:nth-child(4n+4){ color: var(--blue); }
+  .lineup-cloud .t4{ font-family:'Space Grotesk', sans-serif; font-weight:500; font-size:14px; letter-spacing:0.02em; color: var(--cream-dim); }
+  .lineup-cloud .t5{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color: rgba(201,194,178,0.55); }
+
+  /* per-artist typographic character, no logos — just distinct type treatment */
+  .a-avicii{ letter-spacing:0.03em; }
+  .a-garrix{ font-style:italic; letter-spacing:-0.01em; }
+  .a-guetta{ font-weight:900; }
+  .a-walker{ display:inline-block; transform:skewX(-8deg); letter-spacing:0.02em; }
+  .a-skrillex{ display:inline-block; transform:skewX(-6deg); font-weight:900; letter-spacing:-0.02em; }
+  .a-marshmello{ font-weight:600; letter-spacing:0.01em; text-transform:lowercase; }
+  .a-tiesto{ font-weight:500; letter-spacing:0.1em; }
+  .a-harris{ text-decoration:underline; text-underline-offset:7px; text-decoration-thickness:2px; }
+  .a-hardwell{ font-weight:900; letter-spacing:0.04em; }
 
   /* ---------- TICKETS: PISTA ---------- */
   .tickets{ padding: 110px 0 30px; }
@@ -553,18 +569,39 @@
 <section class="lineup" id="lineup">
   <div class="wrap">
     <div class="section-head">
-      <div class="eyebrow">Line-up</div>
-      <h2>4 nacionales + 1 internacional</h2>
-      <p>El cartel se revela pronto — mientras tanto, guarda tu cupo antes de que se agote.</p>
+      <div class="eyebrow">La música</div>
+      <h2>Los himnos que marcaron el 2016</h2>
+      <p>Una noche dedicada a los grandes del EDM: sus canciones, sus remixes, sus himnos — todo en una sola pista.</p>
     </div>
-    <div class="lineup-grid">
-      <div class="lineup-slot"><div class="tag">Nacional</div><div class="mark">Por anunciar</div></div>
-      <div class="lineup-slot"><div class="tag">Nacional</div><div class="mark">Por anunciar</div></div>
-      <div class="lineup-slot"><div class="tag">Nacional</div><div class="mark">Por anunciar</div></div>
-      <div class="lineup-slot"><div class="tag">Nacional</div><div class="mark">Por anunciar</div></div>
-      <div class="lineup-slot intl"><div class="tag">Internacional</div><div class="mark">Por anunciar</div></div>
+
+    <div class="lineup-cloud">
+      <span class="t1 a-avicii">Avicii</span>
+      <span class="t1 a-garrix">Martin Garrix</span>
+      <span class="t1 a-guetta">David Guetta</span>
+      <span class="t2 a-walker">Alan Walker</span>
+      <span class="t2 a-skrillex">Skrillex</span>
+      <span class="t2 a-marshmello">Marshmello</span>
+      <span class="t2 a-tiesto">Tiësto</span>
+      <span class="t2 a-harris">Calvin Harris</span>
+      <span class="t2 a-hardwell">Hardwell</span>
+      <span class="t3">The Chainsmokers</span>
+      <span class="t3">Alesso</span>
+      <span class="t3">Galantis</span>
+      <span class="t3">Major Lazer</span>
+      <span class="t3">Dimitri Vegas &amp; Like Mike</span>
+      <span class="t3">DJ Snake</span>
+      <span class="t3">Afrojack</span>
+      <span class="t3">Armin van Buuren</span>
+      <span class="t3">Swedish House Mafia</span>
+      <span class="t4">Deorro</span>
+      <span class="t4">Oliver Heldens</span>
+      <span class="t4">LMFAO</span>
+      <span class="t4">Zedd</span>
+      <span class="t4">Steve Aoki</span>
+      <span class="t4">Showtek</span>
+      <span class="t4">Jack Ü</span>
+      <span class="t5">y más...</span>
     </div>
-    <p class="lineup-note">Síguenos en Instagram y TikTok — ahí anunciamos cada nombre primero.</p>
   </div>
 </section>
 
@@ -824,7 +861,7 @@
     <div class="faq-list">
       <details class="faq-item">
         <summary>¿Quién va a tocar?<span class="faq-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
-        <div class="faq-answer">4 DJs nacionales y 1 internacional. El line-up completo se revela pronto en nuestras redes.</div>
+        <div class="faq-answer">Es un evento tributo: un DJ nacional y un DJ internacional tocarán en vivo los grandes éxitos del EDM del 2016 — los himnos, los remixes, todo lo que sonaba ese verano.</div>
       </details>
       <details class="faq-item">
         <summary>¿Dónde y cuándo es?<span class="faq-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
@@ -881,7 +918,18 @@
       if(e.isIntersecting){ e.target.classList.add('in-view'); io.unobserve(e.target); }
     });
   }, { threshold: 0.16 });
-  document.querySelectorAll('.ticket, .info-cell, .faq-item, .merch-card, .premium-card, .lineup-slot').forEach(el=> io.observe(el));
+  document.querySelectorAll('.ticket, .info-cell, .faq-item, .merch-card, .premium-card').forEach(el=> io.observe(el));
+
+  const cloud = document.querySelector('.lineup-cloud');
+  if(cloud){
+    cloud.querySelectorAll('span').forEach((s,i)=>{ s.style.transitionDelay = (i*0.035)+'s'; });
+    const io2 = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){ e.target.classList.add('in-view'); io2.unobserve(e.target); }
+      });
+    }, { threshold: 0.1 });
+    io2.observe(cloud);
+  }
 
   /* ---------- Scroll buttons ---------- */
   function scrollToId(id){
