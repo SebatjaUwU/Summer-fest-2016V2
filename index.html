@@ -109,15 +109,57 @@
   .event-cta svg{ width:14px; height:14px; transition: transform 0.25s ease; }
   .event-card:hover .event-cta svg{ transform:translateX(4px); }
 
+  /* ---------- DISCO GIRATORIO ---------- */
+  .disco-wrap{ display:flex; flex-direction:column; align-items:center; padding:20px 0 8px; }
+  .disco-stage{ position:relative; width:min(240px, 55vw); height:min(240px, 55vw); }
+
+  .tonearm{
+    position:absolute; top:-14px; right:6%; width:12px; height:96px;
+    transform-origin: top center; transform: rotate(-32deg);
+    transition: transform 0.6s cubic-bezier(.2,.8,.2,1);
+    z-index:2;
+  }
+  .tonearm::before{ /* brazo */
+    content:''; position:absolute; top:0; left:50%; width:4px; height:100%;
+    background: linear-gradient(var(--cream-dim), var(--cream));
+    border-radius:4px; transform:translateX(-50%);
+  }
+  .tonearm::after{ /* base circular */
+    content:''; position:absolute; top:-8px; left:50%; width:18px; height:18px;
+    border-radius:50%; background:var(--cream-dim); transform:translateX(-50%);
+  }
+  .disco-stage.is-playing .tonearm{ transform: rotate(-8deg); }
+
+  .vinyl{
+    position:absolute; inset:0; border-radius:50%;
+    background:
+      repeating-radial-gradient(circle at center, #14181f 0px, #14181f 2px, #0c0e13 3px, #14181f 4.5px),
+      radial-gradient(circle at 35% 32%, rgba(245,239,217,0.10), transparent 42%);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(245,239,217,0.08);
+    animation: spinVinyl 3.2s linear infinite;
+    animation-play-state: paused;
+  }
+  .disco-stage.is-playing .vinyl{ animation-play-state: running; }
+  .vinyl::before{ /* etiqueta central */
+    content:''; position:absolute; inset:34%; border-radius:50%;
+    background: conic-gradient(from 0deg, var(--sun), var(--dusk-pink), var(--blue), var(--green), var(--sun));
+  }
+  .vinyl::after{ /* hueco central */
+    content:''; position:absolute; inset:47.5%; border-radius:50%;
+    background: var(--night); border:2px solid rgba(245,239,217,0.25);
+  }
+  @keyframes spinVinyl{ to{ transform: rotate(360deg); } }
+
+  .disco-caption{ margin-top:18px; display:flex; align-items:center; gap:10px; }
+  .disco-caption .dot{ width:8px; height:8px; border-radius:50%; background:var(--green); animation: dotPulse 1.1s ease-in-out infinite; }
+  @keyframes dotPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(34,211,122,0.5); } 50%{ box-shadow:0 0 0 6px rgba(34,211,122,0); } }
+  .disco-caption span{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cream-dim); }
+
   /* ---------- SPOTIFY PLAYER ---------- */
   .music{
-    margin:10px 0 70px; padding:24px; border-radius:20px; border:1px solid var(--line);
+    margin:22px 0 70px; padding:24px; border-radius:20px; border:1px solid var(--line);
     background: rgba(245,239,217,0.03);
   }
-  .music-head{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-  .music-head .dot{ width:8px; height:8px; border-radius:50%; background:var(--green); animation: dotPulse 1.1s ease-in-out infinite; }
-  @keyframes dotPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(34,211,122,0.5); } 50%{ box-shadow:0 0 0 6px rgba(34,211,122,0); } }
-  .music-head span{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cream-dim); }
   #spotify-embed iframe{ border-radius:12px; }
 
   footer{ text-align:center; padding:20px 0 50px; font-size:12px; color:var(--cream-dim); }
@@ -140,6 +182,14 @@
       <div class="brand">END OF SUMMER</div>
       <div class="brand-tagline">Fan Tribute — elige la fecha a la que vas</div>
     </header>
+
+    <div class="disco-wrap">
+      <div class="disco-stage" id="discoStage">
+        <div class="tonearm"></div>
+        <div class="vinyl"></div>
+      </div>
+      <div class="disco-caption"><span class="dot"></span><span>Sonando ahora · playlist oficial</span></div>
+    </div>
 
     <nav class="events">
       <a class="event-card event-card--one" href="eventos/summer-2016.html">
@@ -164,7 +214,6 @@
     </nav>
 
     <div class="music">
-      <div class="music-head"><span class="dot"></span><span>Sonando ahora · playlist oficial</span></div>
       <div id="spotify-embed"></div>
     </div>
 
@@ -172,16 +221,10 @@
   </div>
 
   <script>
-    /*
-      PLAYLIST DE SPOTIFY
-      -------------------
-      Este es un PLACEHOLDER (playlist pública "Today's Top Hits" de Spotify).
-      Reemplaza PLAYLIST_ID por el ID de tu playlist real cuando la tengas.
-      El ID es la parte de la URL después de /playlist/ en open.spotify.com/playlist/XXXXXXXX
-    */
-    const PLAYLIST_ID = '37i9dQZF1DXcBWIGoYBM5M';
+    const PLAYLIST_ID = '3TqkQ3ZTP5iKX9Z6ERfLwi';
 
     let spotifyController = null;
+    const discoStage = document.getElementById('discoStage');
 
     window.onSpotifyIframeApiReady = (IFrameAPI) => {
       const element = document.getElementById('spotify-embed');
@@ -192,6 +235,10 @@
       };
       IFrameAPI.createController(element, options, (controller) => {
         spotifyController = controller;
+        // el disco solo gira cuando la playlist realmente está sonando
+        controller.addListener('playback_update', (e) => {
+          discoStage.classList.toggle('is-playing', !e.data.isPaused);
+        });
       });
     };
 
