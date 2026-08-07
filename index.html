@@ -251,6 +251,11 @@
         // el disco solo gira cuando la playlist realmente está sonando
         controller.addListener('playback_update', (e) => {
           discoStage.classList.toggle('is-playing', !e.data.isPaused);
+
+          // adelanto de solo 5 segundos: al llegar ahí, vuelve al inicio en loop
+          if (!e.data.isPaused && e.data.position >= 5000) {
+            controller.seek(0);
+          }
         });
       });
     };
