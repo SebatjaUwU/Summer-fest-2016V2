@@ -124,6 +124,20 @@
   .merch-btn:hover{ transform:translateY(-2px); box-shadow:0 14px 32px rgba(37,211,102,0.32); }
   .merch-btn svg{ width:16px; height:16px; }
 
+  /* ---------- DONACIONES ---------- */
+  .donate-card{
+    max-width:480px; margin:60px auto 0; padding:40px 34px; text-align:center;
+    border:1px solid var(--line); border-radius:22px; background: rgba(245,239,217,0.02);
+  }
+  .donate-heart{ color: var(--sun); margin-bottom:18px; }
+  .donate-heart svg{ width:44px; height:44px; filter: drop-shadow(0 6px 18px rgba(255,106,43,0.4)); }
+  .donate-card .merch-desc{ margin-bottom:24px; }
+  .merch-btn--donate{
+    background: linear-gradient(90deg, var(--sun), var(--sun-soft)); color:#2A0D00;
+    box-shadow: 0 10px 26px rgba(255,106,43,0.28); display:inline-flex;
+  }
+  .merch-btn--donate:hover{ box-shadow:0 14px 32px rgba(255,106,43,0.38); }
+
   /* ---------- ABANICOS (producto nuevo) ---------- */
   .fan-card{
     max-width:900px; margin:60px auto 0; display:grid; grid-template-columns: 1.1fr 1fr; gap:0;
@@ -235,6 +249,22 @@
           Pedir por WhatsApp
         </a>
       </div>
+    </div>
+
+    <div class="section-head">
+      <div class="eyebrow">Donaciones</div>
+      <h2>Apoya el evento</h2>
+    </div>
+
+    <div class="donate-card">
+      <div class="donate-heart">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.2-4.7-10-9.1C.3 8.9 1.6 5 5.2 4.2c2.1-.5 4 .5 4.8 2 .8-1.5 2.7-2.5 4.8-2 3.6.8 4.9 4.7 3.2 7.7C19.2 16.3 12 21 12 21Z"/></svg>
+      </div>
+      <p class="merch-desc">Si quieres ayudarnos a que END OF SUMMER siga sonando, cualquier aporte es bienvenido.</p>
+      <a class="merch-btn merch-btn--donate" href="https://checkout.wompi.co/l/VPOS_XDHjoE" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.2-4.7-10-9.1C.3 8.9 1.6 5 5.2 4.2c2.1-.5 4 .5 4.8 2 .8-1.5 2.7-2.5 4.8-2 3.6.8 4.9 4.7 3.2 7.7C19.2 16.3 12 21 12 21Z"/></svg>
+        Donar por Wompi
+      </a>
     </div>
 
     <footer>END OF SUMMER — Fan Tribute · Bogotá</footer>
