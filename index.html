@@ -172,6 +172,23 @@
   .disco-caption span{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--cream-dim); }
 
   footer{ text-align:center; padding:20px 0 50px; font-size:12px; color:var(--cream-dim); }
+
+  /* ---------- BOTÓN FLOTANTE DE DONACIONES ---------- */
+  .donate-fab{
+    position:fixed; right:22px; bottom:22px; z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    width:58px; height:58px; border-radius:50%;
+    background: linear-gradient(135deg, var(--sun), var(--sun-soft));
+    color:#2A0D00; text-decoration:none;
+    box-shadow: 0 10px 30px rgba(255,106,43,0.4);
+    animation: donatePulse 1.8s ease-in-out infinite;
+  }
+  .donate-fab svg{ width:26px; height:26px; }
+  .donate-fab:hover{ animation-play-state: paused; box-shadow: 0 14px 36px rgba(255,106,43,0.55); }
+  @keyframes donatePulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(255,106,43,0.5), 0 10px 30px rgba(255,106,43,0.4); }
+    50%{ box-shadow:0 0 0 14px rgba(255,106,43,0), 0 10px 30px rgba(255,106,43,0.4); }
+  }
 </style>
 </head>
 <body>
@@ -232,6 +249,10 @@
 
     <footer>END OF SUMMER — Fan Tribute · Bogotá</footer>
   </div>
+
+  <a class="donate-fab" href="https://checkout.wompi.co/l/VPOS_XDHjoE" target="_blank" rel="noopener" aria-label="Donar">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.2-4.7-10-9.1C.3 8.9 1.6 5 5.2 4.2c2.1-.5 4 .5 4.8 2 .8-1.5 2.7-2.5 4.8-2 3.6.8 4.9 4.7 3.2 7.7C19.2 16.3 12 21 12 21Z"/></svg>
+  </a>
 
   <script>
     const PLAYLIST_ID = '3TqkQ3ZTP5iKX9Z6ERfLwi';
