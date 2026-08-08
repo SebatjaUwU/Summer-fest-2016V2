@@ -20,21 +20,21 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>END OF SUMMER — Fan Tribute | Teatro Republik, Bogotá</title>
-<meta name="description" content="END OF SUMMER — Fan Tribute: la fiesta homenaje a los clásicos del EDM de 2016. 5 de septiembre en Teatro Republik, Bogotá. Preventa, General y Mesas VIP disponibles.">
+<meta name="description" content="END OF SUMMER — Fan Tribute: la fiesta homenaje a los clásicos del EDM de 2016. 5 de septiembre en Teatro Republik, Bogotá. General y Mesas VIP disponibles.">
 <link rel="canonical" href="https://end-of-summer-2016.netlify.app/">
 <meta name="google-site-verification" content="9UQNuaMB8Jt0jZjn6CBWk640XL7a3OsMYDVkiC3x57k">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="END OF SUMMER — Fan Tribute">
 <meta property="og:title" content="END OF SUMMER — Fan Tribute | Teatro Republik, Bogotá">
-<meta property="og:description" content="La fiesta homenaje a los clásicos del EDM de 2016. 5 de septiembre en Teatro Republik, Bogotá. Preventa, General y Mesas VIP disponibles.">
+<meta property="og:description" content="La fiesta homenaje a los clásicos del EDM de 2016. 5 de septiembre en Teatro Republik, Bogotá. General y Mesas VIP disponibles.">
 <meta property="og:image" content="https://end-of-summer-2016.netlify.app/og-image.png">
 <meta property="og:url" content="https://end-of-summer-2016.netlify.app/">
 <meta property="og:locale" content="es_CO">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="END OF SUMMER — Fan Tribute | Teatro Republik, Bogotá">
-<meta name="twitter:description" content="La fiesta homenaje a los clásicos del EDM de 2016. 5 de septiembre en Teatro Republik, Bogotá. Preventa, General y Mesas VIP disponibles.">
+<meta name="twitter:description" content="La fiesta homenaje a los clásicos del EDM de 2016. 5 de septiembre en Teatro Republik, Bogotá. General y Mesas VIP disponibles.">
 <meta name="twitter:image" content="https://end-of-summer-2016.netlify.app/og-image.png">
 
 <script type="application/ld+json">
@@ -42,7 +42,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   "@context": "https://schema.org",
   "@type": "Event",
   "name": "END OF SUMMER — Fan Tribute",
-  "description": "La fiesta homenaje a los clásicos del EDM de 2016. Preventa, General y Mesas VIP disponibles.",
+  "description": "La fiesta homenaje a los clásicos del EDM de 2016. General y Mesas VIP disponibles.",
   "startDate": "2026-09-05T22:00:00-05:00",
   "endDate": "2026-09-06T03:00:00-05:00",
   "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
@@ -66,15 +66,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     "url": "https://end-of-summer-2016.netlify.app/"
   },
   "offers": [
-    {
-      "@type": "Offer",
-      "name": "Preventa",
-      "price": "37000",
-      "priceCurrency": "COP",
-      "availability": "https://schema.org/InStock",
-      "validFrom": "2026-07-10",
-      "url": "https://checkout.wompi.co/l/1oKPkP"
-    },
     {
       "@type": "Offer",
       "name": "General",
@@ -526,117 +517,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   }
   @media (max-width:820px){
     .ticket-grid{ grid-template-columns:1fr; }
-
-    /* En móvil, General se muestra antes que Preventa */
-    .tickets .wrap{ display:flex; flex-direction:column; }
-    .tickets .section-head{ order:0; }
-    .tickets .ticket-grid{ order:1; }
-    .tickets .preventa{ order:2; margin-top:44px; }
   }
-
-  /* ---------- PREVENTA (special, public counter) ---------- */
-  .preventa{
-    position:relative;
-    max-width:640px;
-    margin:0 auto 44px;
-    border-radius:20px;
-    padding:36px 36px 32px;
-    border:1px solid rgba(155,93,229,0.35);
-    background: linear-gradient(165deg, rgba(155,93,229,0.12), rgba(232,54,143,0.05));
-    overflow:hidden;
-    opacity:0;
-    transform:translateY(24px);
-    transition: transform 0.45s cubic-bezier(.2,.8,.2,1), box-shadow 0.45s ease, border-color 0.45s ease;
-  }
-  .preventa::before{
-    content:'';
-    position:absolute; top:0; left:0; right:0; height:3px;
-    background: linear-gradient(90deg, var(--dusk-purple), var(--dusk-pink), var(--sun));
-  }
-  .preventa.in-view{ opacity:1; transform:translateY(0); }
-  .preventa:hover{ transform:translateY(-6px); box-shadow:0 20px 50px rgba(155,93,229,0.18); border-color:rgba(155,93,229,0.5); }
-
-  .preventa-badge{
-    display:inline-flex;
-    align-items:center;
-    gap:7px;
-    font-family:'JetBrains Mono', monospace;
-    font-size:11px;
-    letter-spacing:0.1em;
-    text-transform:uppercase;
-    padding:7px 14px;
-    border-radius:100px;
-    background: rgba(155,93,229,0.15);
-    border:1px solid rgba(155,93,229,0.4);
-    color: #C9A6FF;
-    margin-bottom:20px;
-  }
-
-  .preventa-top{
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    flex-wrap:wrap;
-    gap:10px;
-    margin-bottom:12px;
-  }
-  .preventa-kind{
-    font-family:'Unbounded', sans-serif;
-    font-weight:800;
-    font-size:24px;
-    background: linear-gradient(90deg, var(--dusk-purple), var(--dusk-pink));
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-  }
-  .preventa-price{
-    font-family:'Unbounded', sans-serif;
-    font-weight:900;
-    font-size:40px;
-    color: var(--cream);
-  }
-  .preventa-price sup{ font-size:15px; font-weight:600; color:var(--cream-dim); margin-right:2px; }
-
-  .preventa-desc{
-    font-size:14.5px;
-    line-height:1.6;
-    color: var(--cream-dim);
-    margin-bottom:24px;
-  }
-  .preventa-desc strong{ color: var(--cream); font-weight:600; }
-
-  .progress-track{
-    width:100%;
-    height:6px;
-    border-radius:100px;
-    background: rgba(247,241,228,0.08);
-    overflow:hidden;
-    margin-bottom:9px;
-  }
-  .progress-fill{
-    height:100%;
-    width:0%;
-    border-radius:100px;
-    background: linear-gradient(90deg, var(--dusk-purple), var(--dusk-pink));
-    transition: width 0.8s cubic-bezier(.2,.8,.2,1);
-  }
-  .progress-label{
-    font-family:'JetBrains Mono', monospace;
-    font-size:11.5px;
-    color: var(--cream-dim);
-    margin-bottom:22px;
-  }
-  .progress-label.is-low{ color:#FF4D6D; }
-
-  .buy-btn--preventa{
-    background: linear-gradient(90deg, var(--dusk-purple), var(--dusk-pink));
-    color:#0B0705;
-    box-shadow: 0 10px 26px rgba(155,93,229,0.25);
-  }
-  .buy-btn--preventa:hover{ transform:translateY(-2px); box-shadow:0 14px 32px rgba(232,54,143,0.32); }
-
-  .preventa.is-soldout{ filter:grayscale(0.6); opacity:0.75; }
-  .preventa.is-soldout .preventa-price{ text-decoration:line-through; text-decoration-color: var(--cream-dim); }
 
   .ticket{
     position:relative;
@@ -1380,29 +1261,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <h2>Dos formas de vivir el verano por última vez</h2>
     </div>
 
-    <div class="preventa" id="preventaCard">
-      <div class="preventa-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2L12 16.4l-6.3 4.6 2.3-7.2-6-4.6h7.6z"/></svg>
-        Cupo limitado · 30 entradas
-      </div>
-
-      <div class="preventa-top">
-        <div class="preventa-kind">Preventa</div>
-        <div class="preventa-price"><sup>$</sup>37K</div>
-      </div>
-      <div class="service-fee">Precio final, incluye servicio</div>
-
-      <p class="preventa-desc">Las primeras 30 personas entran más barato, con <strong>$20.000 en consumible</strong> incluido, y además se llevan un <strong>regalo sorpresa</strong>: gafas, pulsera o boleta conmemorativa de la fiesta.</p>
-
-      <div class="progress-track"><div class="progress-fill" id="preventaFill"></div></div>
-      <div class="progress-label" id="preventaLabel"></div>
-
-      <a href="https://checkout.wompi.co/l/1oKPkP" target="_blank" rel="noopener" class="buy-btn buy-btn--preventa" data-ticket="preventa" id="preventaBuyBtn">
-        Comprar Preventa
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-      </a>
-    </div>
-
     <div class="ticket-grid">
 
       <!-- GENERAL -->
@@ -1610,10 +1468,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </details>
 
       <details class="faq-item">
-        <summary>¿Qué diferencia hay entre Preventa, General y VIP?
+        <summary>¿Qué diferencia hay entre General y VIP?
           <span class="faq-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
         </summary>
-        <div class="faq-answer">Preventa ($37K, precio final) son las primeras 30 entradas, más económicas, con $20.000 en consumible incluido y regalo sorpresa. General ($42K, precio final) incluye $20.000 en consumible. VIP ($320K, precio final) es una mesa para 5–6 personas con botella, agua y ubicación premium lejos de la aglomeración.</div>
+        <div class="faq-answer">General ($42K, precio final) incluye $20.000 en consumible y acceso a pista. VIP ($320K, precio final) es una mesa para 5–6 personas con botella, agua y ubicación premium lejos de la aglomeración.</div>
       </details>
     </div>
   </div>
@@ -1632,7 +1490,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     });
   }, { threshold: 0.18 });
 
-  document.querySelectorAll('.ticket, .info-cell, .preventa, .faq-item, .merch-card').forEach(el=> io.observe(el));
+  document.querySelectorAll('.ticket, .info-cell, .faq-item, .merch-card').forEach(el=> io.observe(el));
 
   function scrollToTickets(){
     const target = document.getElementById('entradas');
@@ -1662,12 +1520,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
      hosting (Netlify) para que se refleje.
      ============================================================ */
   const STOCK = {
-    preventa: {
-      total: 30,                // <-- cupo público de preventa
-      remaining: 15,            // <-- EDITA ESTE NÚMERO
-      lowThreshold: 5,
-      unit: 'entrada'
-    },
     general: {
       total: 200,               // <-- capacidad total de entradas General
       remaining: 0,             // <-- EDITA ESTE NÚMERO
@@ -1709,37 +1561,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     }
   }
 
-  function renderPreventa(){
-    const cfg = STOCK.preventa;
-    const fill = document.getElementById('preventaFill');
-    const label = document.getElementById('preventaLabel');
-    const btn = document.getElementById('preventaBuyBtn');
-    const card = document.getElementById('preventaCard');
-    if(!cfg || !fill || !label || !btn || !card) return;
-
-    const remaining = cfg.remaining;
-    const sold = cfg.total - remaining;
-    const pct = Math.min(100, Math.round((sold / cfg.total) * 100));
-    fill.style.width = pct + '%';
-
-    if(remaining <= 0){
-      label.textContent = 'Preventa agotada — ' + cfg.total + ' de ' + cfg.total + ' vendidas';
-      label.classList.add('is-low');
-      btn.classList.add('is-soldout');
-      btn.innerHTML = 'Agotado';
-      btn.removeAttribute('href');
-      card.classList.add('is-soldout');
-    } else if(remaining <= cfg.lowThreshold){
-      label.textContent = '¡Solo quedan ' + remaining + ' de ' + cfg.total + '!';
-      label.classList.add('is-low');
-    } else {
-      label.textContent = sold + ' de ' + cfg.total + ' vendidas · quedan ' + remaining;
-    }
-  }
-
   renderStock('general', 'generalStock', 'generalBuyBtn', 'generalCard');
   renderStock('vip', 'vipStock', 'vipBuyBtn', 'vipCard', true);
-  renderPreventa();
 </script>
 
 </body>
