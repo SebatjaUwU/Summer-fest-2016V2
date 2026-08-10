@@ -635,14 +635,14 @@
               <div class="ticket-tag">WhatsApp</div>
             </div>
             <div class="ticket-price"><sup>$</sup>35K</div>
-            <div class="ticket-price-note">Cupo limitado a los primeros 40</div>
+            <div class="ticket-price-note">Hasta 100 entradas disponibles</div>
             <div class="stock-indicator" id="pv1Stock"></div>
             <div class="progress-track"><div class="progress-fill" id="pv1Fill"></div></div>
             <div class="progress-label" id="pv1Label"></div>
 
             <hr class="perforation">
             <ul class="ticket-feats">
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Los primeros 40 reciben <strong>regalo sorpresa</strong>: gafas, boleta conmemorativa o pulsera.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Los primeros 40 llevaban <strong>regalo sorpresa</strong> (gafas, boleta conmemorativa o pulsera) — <em>ya agotado</em>, no viene incluido para el resto.</span></li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>$20.000 en consumibles incluidos.</span></li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Acceso a pista, primer y tercer piso.</span></li>
             </ul>
@@ -941,7 +941,7 @@
 
   /* ---------- Stock / price system ---------- */
   const STOCK = {
-    pv1: { total: 40, remaining: 0, lowThreshold: 8, unit: 'entrada' },
+    pv1: { total: 100, remaining: 60, lowThreshold: 8, unit: 'entrada' },
     pv2: { total: 150, remaining: 0, lowThreshold: 15, unit: 'entrada' },
     gen: { total: 250, remaining: 0, lowThreshold: 20, unit: 'entrada' },
     vip: { total: 12, remaining: 12, lowThreshold: 3, unit: 'mesa' },
