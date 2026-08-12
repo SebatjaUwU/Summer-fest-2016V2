@@ -29,8 +29,35 @@ const HEADERS = [
   'Monto COP', 'Estado', 'Email enviado', 'Escaneado', 'Fecha escaneo'
 ];
 
-function doGet() {
-  return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+/**
+ * Sin parametros: healthcheck ("OK").
+ * Con ?id=<transaction_id de Wompi>: consulta si ya se genero el ticket
+ * para esa transaccion, para que confirmacion.html muestre el mismo
+ * nombre/codigo que se envio por Gmail. Se usa desde el navegador
+ * (fetch), por eso responde solo GET y solo datos no sensibles.
+ */
+function doGet(e) {
+  const id = e && e.parameter && e.parameter.id;
+  if (!id) {
+    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+  }
+
+  const sheet = getSheet_();
+  const row = findRowByTransactionId_(sheet, id);
+  if (!row) {
+    return jsonResponse_({ found: false });
+  }
+
+  const values = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+  return jsonResponse_({
+    found: true,
+    evento: values[1],
+    tipo: values[2],
+    numero: values[3],
+    ticketId: values[4],
+    nombre: values[7],
+    estado: values[11]
+  });
 }
 
 function doPost(e) {

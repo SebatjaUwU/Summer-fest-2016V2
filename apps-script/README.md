@@ -49,6 +49,31 @@ Definido en `LINK_MAP` dentro de `Code.gs`:
 Si se crea un nuevo Payment Link en Wompi, hay que agregar su `link_id`
 aquí para que el ticket quede bien clasificado.
 
+## Página de confirmación dinámica (eventos/confirmacion.html)
+
+Al terminar el pago, Wompi redirige al comprador a la "URL de
+redirección" configurada en cada Payment Link, agregando
+`?id=<transaction_id>` automáticamente. `confirmacion.html` lee ese
+`id`, le pregunta a `doGet` de este mismo script si ya se generó el
+ticket (`GET /exec?id=<transaction_id>`) y, si lo encuentra, muestra el
+**mismo** nombre, tipo de entrada y código QR que se envió por Gmail —
+un solo código válido por compra, no uno distinto en pantalla.
+
+Si la respuesta aún no está lista (el webhook puede tardar unos
+segundos más que la redirección), reintenta cada 2s hasta 10 veces; si
+sigue sin encontrarla, cae de vuelta al mensaje genérico de "revisa tu
+correo" que ya existía.
+
+**Falta configurar en Wompi:** en cada Payment Link (dashboard Wompi →
+editar el link) hay un campo de **URL de redirección** — apúntalo a
+`https://<tu-dominio>/eventos/confirmacion.html`. Sin este paso, la
+página siempre cae al mensaje genérico porque no recibe el `id`.
+
+Si cambias la URL del despliegue de Apps Script (nueva implementación
+con otra URL `/exec`), hay que actualizar la constante
+`APPS_SCRIPT_URL` dentro del `<script>` al final de
+`eventos/confirmacion.html`.
+
 ## Validar (sandbox, recomendado — no gasta dinero real)
 
 1. En Wompi, activa modo **Sandbox/Pruebas** (llaves `pub_test_...` /
