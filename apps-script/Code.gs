@@ -1,17 +1,30 @@
 /**
- * Repositorio de QR — recibe el webhook de Wompi cuando una transacción se
- * aprueba, genera un ticket numerado por tipo, lo guarda en esta Sheet y
- * envía el QR por Gmail al comprador.
+ * Repositorio de QR — revisa periódicamente la bandeja de Gmail buscando
+ * los correos "Transacción APROBADA" que Wompi manda automáticamente,
+ * genera un ticket numerado por tipo, lo guarda en esta Sheet y envía el
+ * QR por Gmail al comprador.
  *
- * Configuración requerida (Extensiones > Apps Script > Configuración del
- * proyecto > Propiedades de secuencia de comandos), NUNCA en este archivo:
- *   WOMPI_EVENTS_SECRET   -> Secreto de eventos (dashboard Wompi > API Keys)
- *   WOMPI_PRIVATE_KEY     -> Llave privada (por si se necesita consultar la API)
- *   SENDER_EMAIL          -> Cuenta Gmail que envía (debe ser la cuenta dueña
- *                             de este script para que GmailApp la use)
+ * No usa webhook de Wompi (no hace falta configurar nada en el dashboard
+ * de Wompi ni guardar WOMPI_EVENTS_SECRET). Todo se dispara desde un
+ * trigger de tiempo que corre esta función:
+ *
+ *   checkWompiSales
+ *
+ * Configuración requerida (una sola vez):
+ *   1. Extensiones > Apps Script > icono de reloj "Activadores" (Triggers)
+ *      > Añadir activador:
+ *        - Función a ejecutar: checkWompiSales
+ *        - Origen del evento: Basado en tiempo
+ *        - Tipo de activador: Temporizador por minutos
+ *        - Cada 5 minutos (o el intervalo que prefieras)
+ *   2. Nada más — no se necesitan Propiedades de secuencia de comandos.
  */
 
-// payment_link_id (Wompi) -> { evento, tipo, prefijo }
+// payment_link_id (Wompi) -> { evento, tipo, prefijo, cantidad }
+// "cantidad" = cuantos tickets/QR genera UNA transaccion de ese link.
+// Si no se pone, se asume 1. Los combos generan varios tickets del mismo
+// tipo base (misma numeracion que Preventa 2 individual) en una sola
+// compra, y el correo trae un QR por cada uno.
 const LINK_MAP = {
   '4VUCiA': { evento: 'End of Summer', tipo: 'Preventa 2', prefijo: 'EOS-PV2' },
   'R2amMy': { evento: 'End of Summer', tipo: 'General',    prefijo: 'EOS-GEN' },
@@ -20,6 +33,8 @@ const LINK_MAP = {
   '1oKPkP': { evento: 'Summer 2016',   tipo: 'Preventa',   prefijo: 'S16-PRE' },
   'URc8lu': { evento: 'Summer 2016',   tipo: 'General',    prefijo: 'S16-GEN' },
   'djWZHo': { evento: 'Summer 2016',   tipo: 'VIP',        prefijo: 'S16-VIP' },
+  'DaFT0V': { evento: 'End of Summer', tipo: 'Preventa 2', prefijo: 'EOS-PV2', cantidad: 2 },
+  'WgEtRz': { evento: 'End of Summer', tipo: 'Preventa 2', prefijo: 'EOS-PV2', cantidad: 3 },
 };
 
 const SHEET_NAME = 'Repositorio QR';
@@ -29,12 +44,39 @@ const HEADERS = [
   'Monto COP', 'Estado', 'Email enviado', 'Escaneado', 'Fecha escaneo'
 ];
 
+// Solo estos link_id se procesan automaticamente (Preventa 2, General, y
+// los combos x2/x3 de Preventa 2, todos de End of Summer). VIP y
+// Backstage son mesas — se coordinan a mano, no por QR automatico. Si
+// algun dia quieres sumar otro tipo al flujo automatico, agrega su
+// link_id aqui.
+const AUTO_LINK_IDS = ['4VUCiA', 'R2amMy', 'DaFT0V', 'WgEtRz'];
+
+const LABEL_OK = 'QR-Procesado';
+const LABEL_REVIEW = 'QR-Revisar';
+const LABEL_OLD = 'QR-Anterior';
+const LABEL_MANUAL = 'QR-Manual';
+const GMAIL_SEARCH = 'from:(no-reply@wompi.co) "APROBADA" -label:' + LABEL_OK + ' -label:' + LABEL_REVIEW + ' -label:' + LABEL_OLD + ' -label:' + LABEL_MANUAL;
+
+/**
+ * Ignora cualquier correo de Wompi anterior a esta fecha/hora — asi no
+ * reprocesa ventas viejas que ya estaban en la bandeja antes de activar
+ * este sistema. Si alguna vez quieres reprocesar correos de antes,
+ * cambia esta fecha hacia atras.
+ */
+const IGNORE_BEFORE = new Date('2026-08-12T00:00:00');
+
 /**
  * Sin parametros: healthcheck ("OK").
  * Con ?id=<transaction_id de Wompi>: consulta si ya se genero el ticket
  * para esa transaccion, para que confirmacion.html muestre el mismo
  * nombre/codigo que se envio por Gmail. Se usa desde el navegador
  * (fetch), por eso responde solo GET y solo datos no sensibles.
+ *
+ * Nota: como ahora el ticket se genera cuando el trigger de Gmail
+ * procesa el correo (no al instante del pago), confirmacion.html puede
+ * no encontrarlo todavia dentro de sus reintentos y caer al mensaje
+ * generico de "revisa tu correo" — eso es esperado, el correo con el QR
+ * real igual llega poco despues.
  */
 function doGet(e) {
   const id = e && e.parameter && e.parameter.id;
@@ -60,112 +102,220 @@ function doGet(e) {
   });
 }
 
-function doPost(e) {
-  try {
-    const body = JSON.parse(e.postData.contents);
+/**
+ * Punto de entrada del trigger de tiempo. Busca correos de Wompi sin
+ * procesar, genera el ticket + fila en la Sheet + email con QR por cada
+ * uno, y los marca con una etiqueta de Gmail para no repetirlos.
+ */
+function checkWompiSales() {
+  const labelOk = getOrCreateLabel_(LABEL_OK);
+  const labelReview = getOrCreateLabel_(LABEL_REVIEW);
+  const labelOld = getOrCreateLabel_(LABEL_OLD);
+  const labelManual = getOrCreateLabel_(LABEL_MANUAL);
 
-    if (!verifyWompiSignature_(body)) {
-      Logger.log('Firma invalida, evento ignorado');
-      return jsonResponse_({ ok: false, reason: 'invalid_signature' });
-    }
+  const threads = GmailApp.search(GMAIL_SEARCH, 0, 20);
 
-    const tx = body.data && body.data.transaction;
-    if (!tx || tx.status !== 'APPROVED') {
-      return jsonResponse_({ ok: true, ignored: true, reason: 'not_approved' });
-    }
+  threads.forEach(function (thread) {
+    thread.getMessages().forEach(function (message) {
+      if (message.getDate() < IGNORE_BEFORE) {
+        thread.addLabel(labelOld);
+        return;
+      }
+      try {
+        processWompiMessage_(message, thread, labelOk, labelReview, labelManual);
+      } catch (err) {
+        Logger.log('Error procesando correo "' + message.getSubject() + '": ' + err);
+        notifyReview_(message, String(err));
+        thread.addLabel(labelReview);
+      }
+    });
+  });
+}
 
-    const sheet = getSheet_();
-    if (findRowByTransactionId_(sheet, tx.id)) {
-      return jsonResponse_({ ok: true, ignored: true, reason: 'already_processed' });
-    }
+function processWompiMessage_(message, thread, labelOk, labelReview, labelManual) {
+  const parsed = parseWompiEmail_(message);
 
-    const linkInfo = LINK_MAP[tx.payment_link_id] || {
-      evento: 'Desconocido', tipo: 'General', prefijo: 'GEN'
-    };
+  if (!parsed) {
+    notifyReview_(message, 'No se encontro "ref." en el asunto — formato de correo inesperado.');
+    thread.addLabel(labelReview);
+    return;
+  }
 
+  const linkInfo = LINK_MAP[parsed.linkId];
+  if (!linkInfo) {
+    notifyReview_(message, 'El identificador de link "' + parsed.linkId + '" no esta en LINK_MAP.');
+    thread.addLabel(labelReview);
+    return;
+  }
+
+  if (AUTO_LINK_IDS.indexOf(parsed.linkId) === -1) {
+    // VIP, Backstage u otro tipo fuera del flujo automatico: no es un
+    // error, simplemente se coordina a mano. No se guarda en la Sheet
+    // ni se manda correo.
+    thread.addLabel(labelManual);
+    return;
+  }
+
+  if (!parsed.email) {
+    notifyReview_(message, 'No se pudo extraer el correo del comprador (referencia ' + parsed.referencia + ').');
+    thread.addLabel(labelReview);
+    return;
+  }
+
+  const sheet = getSheet_();
+  const txKey = parsed.txId || parsed.referencia;
+
+  if (findRowByTransactionId_(sheet, txKey)) {
+    thread.addLabel(labelOk);
+    return;
+  }
+
+  const nombre = parsed.nombre || 'Sin nombre';
+  const cantidad = linkInfo.cantidad || 1;
+  // El monto que trae el correo es el total de la transaccion (ej. el
+  // combo completo) — se reparte entre los tickets generados para que la
+  // columna "Monto COP" siga representando el valor de cada ticket.
+  const montoPorTicket = Math.round((parsed.montoCOP || 0) / cantidad);
+
+  const tickets = [];
+  for (let i = 0; i < cantidad; i++) {
     const numero = getNextTicketNumber_(sheet, linkInfo.prefijo);
     const ticketId = linkInfo.prefijo + '-' + String(numero).padStart(3, '0');
-
-    const nombre = (tx.customer_data && tx.customer_data.full_name) || 'Sin nombre';
-    const telefono = (tx.customer_data && tx.customer_data.phone_number) || '';
-    const email = tx.customer_email || '';
-    const montoCOP = Math.round((tx.amount_in_cents || 0) / 100);
 
     appendRow_(sheet, {
       evento: linkInfo.evento,
       tipo: linkInfo.tipo,
       numero: numero,
       ticketId: ticketId,
-      txId: tx.id,
-      referencia: tx.reference,
+      txId: txKey,
+      referencia: parsed.referencia,
       nombre: nombre,
-      email: email,
-      telefono: telefono,
-      montoCOP: montoCOP,
-      estado: tx.status
+      email: parsed.email,
+      telefono: parsed.telefono,
+      montoCOP: montoPorTicket,
+      estado: 'APPROVED'
     });
 
-    let enviado = false;
-    if (email) {
-      try {
-        sendTicketEmail_({
-          email: email,
-          nombre: nombre,
-          evento: linkInfo.evento,
-          tipo: linkInfo.tipo,
-          numero: numero,
-          ticketId: ticketId
-        });
-        enviado = true;
-      } catch (mailErr) {
-        Logger.log('Error enviando email: ' + mailErr);
+    tickets.push({ numero: numero, ticketId: ticketId });
+  }
+
+  let enviado = false;
+  try {
+    sendTicketEmail_({
+      email: parsed.email,
+      nombre: nombre,
+      evento: linkInfo.evento,
+      tipo: linkInfo.tipo,
+      tickets: tickets
+    });
+    enviado = true;
+  } catch (mailErr) {
+    Logger.log('Error enviando email: ' + mailErr);
+  }
+  setEmailSentFlag_(sheet, txKey, enviado);
+
+  thread.addLabel(labelOk);
+}
+
+/**
+ * Extrae del correo de Wompi: identificador de link (de la referencia
+ * en el asunto), referencia completa, monto, nombre del comprador,
+ * transaccion #, correo y telefono del comprador.
+ *
+ * El asunto trae "...ref. <link_id>_<timestamp>_<random>", ej.
+ * "ref. URc8lu_1786120306_HdIE5sB4K" -> link_id = "URc8lu".
+ */
+function parseWompiEmail_(message) {
+  const subject = message.getSubject() || '';
+  const refMatch = subject.match(/ref\.\s*(\S+)/i);
+  if (!refMatch) return null;
+
+  const referencia = refMatch[1];
+  const linkId = referencia.split('_')[0];
+  const body = message.getPlainBody() || '';
+
+  return {
+    linkId: linkId,
+    referencia: referencia,
+    montoCOP: parseAmount_(body),
+    nombre: extractTableValue_(body, 'Comprador'),
+    txId: extractTableValue_(body, 'Transacción #') || extractTableValue_(body, 'Transaccion #'),
+    email: extractBuyerEmail_(body),
+    telefono: extractBuyerPhone_(body)
+  };
+}
+
+/**
+ * El cuerpo trae: "...escribiendo a <email> o llamando al <telefono>",
+ * los dos en la misma linea/parrafo.
+ */
+function extractBuyerEmail_(body) {
+  const m = body.match(/escribiendo a\s*([^\s@]+@[^\s]+?)\s+o llamando al/i);
+  return m ? m[1].trim() : '';
+}
+
+function extractBuyerPhone_(body) {
+  const m = body.match(/o llamando al\s*(\+?\d[\d ]*)/i);
+  return m ? m[1].trim() : '';
+}
+
+function parseAmount_(body) {
+  const m = body.match(/COP\s*\$\s*([\d.,]+)/);
+  if (!m) return 0;
+  return Math.round(parseFloat(m[1].replace(/\./g, '').replace(/,/g, '')));
+}
+
+/**
+ * Busca "Label<tab/espacios>valor" en la misma linea; si no lo
+ * encuentra, busca una linea que sea exactamente el label y toma la
+ * primera linea no vacia que venga despues (hasta 3 lineas mas abajo).
+ */
+function extractTableValue_(body, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const sameLine = body.match(new RegExp(escaped + '[ \\t]+([^\\r\\n]+)'));
+  if (sameLine && sameLine[1].trim()) return sameLine[1].trim();
+
+  const lines = body.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === label) {
+      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+        const val = lines[j].trim();
+        if (val) return val;
       }
     }
-    setEmailSentFlag_(sheet, tx.id, enviado);
+  }
+  return '';
+}
 
-    return jsonResponse_({ ok: true, ticketId: ticketId, emailEnviado: enviado });
-  } catch (err) {
-    Logger.log('Error en doPost: ' + err);
-    return jsonResponse_({ ok: false, error: String(err) });
+function getOrCreateLabel_(name) {
+  return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name);
+}
+
+/**
+ * Avisa al dueño de la cuenta (por correo) cuando una venta no se pudo
+ * procesar sola, para que la revise y la agregue manualmente si hace
+ * falta.
+ */
+function notifyReview_(message, motivo) {
+  try {
+    GmailApp.sendEmail(
+      Session.getEffectiveUser().getEmail(),
+      'Revisar venta no procesada — Repositorio QR',
+      'No se pudo generar el ticket automaticamente.\n\n' +
+      'Motivo: ' + motivo + '\n\n' +
+      'Asunto del correo original: ' + message.getSubject() + '\n' +
+      'Fecha: ' + message.getDate() + '\n\n' +
+      'Revisalo manualmente (etiqueta "' + LABEL_REVIEW + '" en Gmail) y agrega la fila en la Sheet si corresponde.'
+    );
+  } catch (e) {
+    Logger.log('No se pudo enviar la alerta de revision: ' + e);
   }
 }
 
 function jsonResponse_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
-}
-
-/**
- * Verifica el checksum de Wompi: SHA256( valores de signature.properties
- * concatenados + timestamp + secreto de eventos ).
- */
-function verifyWompiSignature_(body) {
-  const secret = PropertiesService.getScriptProperties().getProperty('WOMPI_EVENTS_SECRET');
-  if (!secret) throw new Error('Falta WOMPI_EVENTS_SECRET en Script Properties');
-
-  const sig = body.signature;
-  if (!sig || !sig.properties || !sig.checksum) return false;
-
-  let concatenated = '';
-  sig.properties.forEach(function (path) {
-    concatenated += getByPath_(body.data, path.replace(/^data\./, ''));
-  });
-  concatenated += body.timestamp;
-  concatenated += secret;
-
-  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, concatenated);
-  const hex = digest.map(function (b) {
-    const v = (b < 0 ? b + 256 : b).toString(16);
-    return v.length === 1 ? '0' + v : v;
-  }).join('');
-
-  return hex.toLowerCase() === String(sig.checksum).toLowerCase();
-}
-
-function getByPath_(obj, path) {
-  return path.split('.').reduce(function (acc, key) {
-    return acc && acc[key] !== undefined ? acc[key] : '';
-  }, obj);
 }
 
 function getSheet_() {
@@ -209,8 +359,11 @@ function appendRow_(sheet, d) {
 }
 
 function setEmailSentFlag_(sheet, txId, sent) {
-  const row = findRowByTransactionId_(sheet, txId);
-  if (row) sheet.getRange(row, 13).setValue(sent);
+  // Un combo genera varias filas con el mismo txId — se marcan todas.
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][5] === txId) sheet.getRange(i + 1, 13).setValue(sent);
+  }
 }
 
 function generateQrBlob_(ticketId) {
@@ -219,38 +372,90 @@ function generateQrBlob_(ticketId) {
   return resp.getBlob().setName('qr-' + ticketId + '.png');
 }
 
+/**
+ * d.tickets es un array de { numero, ticketId } — 1 elemento en una
+ * compra normal, 2 o 3 en un combo. Cada uno trae su propio QR dentro
+ * del mismo correo.
+ */
 function sendTicketEmail_(d) {
-  const qrBlob = generateQrBlob_(d.ticketId);
-  const cid = 'qrcode';
+  const inlineImages = {};
+  const ticketsConCid = d.tickets.map(function (t, i) {
+    const cid = 'qrcode' + i;
+    inlineImages[cid] = generateQrBlob_(t.ticketId);
+    return { numero: t.numero, ticketId: t.ticketId, cid: cid };
+  });
 
-  const html = buildEmailHtml_(d, cid);
+  const html = buildEmailHtml_({
+    nombre: d.nombre,
+    evento: d.evento,
+    tipo: d.tipo,
+    tickets: ticketsConCid
+  });
 
-  GmailApp.sendEmail(d.email, 'Tu entrada para ' + d.evento + ' — ' + d.tipo, '', {
+  GmailApp.sendEmail(d.email, buildEmailSubject_(d), '', {
     htmlBody: html,
-    inlineImages: { qrcode: qrBlob },
+    inlineImages: inlineImages,
     name: 'Fan Tribute'
   });
 }
 
-function buildEmailHtml_(d, cid) {
-  const night = '#070E17', night2 = '#0E1E30', sun = '#FF6A2B',
-        dusk = '#E8368F', cream = '#F7F1E4', creamDim = '#C9C2B2',
-        line = 'rgba(247,241,228,0.14)';
+/**
+ * Solo Preventa 2 y General (End of Summer, la segunda fecha) usan el
+ * asunto nuevo. El resto de tipos/eventos conserva el asunto anterior.
+ */
+function buildEmailSubject_(d) {
+  if (d.evento === 'End of Summer' && (d.tipo === 'Preventa 2' || d.tipo === 'General')) {
+    return 'QR ' + d.tipo.toUpperCase() + ' SEGUNDA FECHA';
+  }
+  return 'Tu entrada para ' + d.evento + ' — ' + d.tipo;
+}
+
+// Info fija del evento (fecha/venue), la misma que ya esta publicada en
+// end-of-summer-2.html / summer-2016.html. Solo se usa para el correo.
+const EVENT_INFO = {
+  'End of Summer': { sub: 'Segunda fecha &middot; Viernes 4 de septiembre', footer: 'Teatro Republik, Bogot&aacute; &middot; 9:00 p.m. &mdash; 3:00 a.m.' },
+  'Summer 2016':   { sub: 'Primera fecha &middot; 5 de septiembre',          footer: 'Teatro Republik, Bogot&aacute; &middot; 10:00 p.m. &mdash; 3:00 a.m.' }
+};
+
+function buildEmailHtml_(d) {
+  const bg = '#040E08', card = '#0B1F14', neon = '#3DFF8B', neonDim = 'rgba(61,255,139,0.35)',
+        cream = '#F5EFE0', dim = '#8FA79B';
+
+  const info = EVENT_INFO[d.evento] || { sub: '', footer: '' };
+  const cantidad = d.tickets.length;
+
+  const qrBlocks = d.tickets.map(function (t, i) {
+    const entradaLabel = cantidad > 1 ? 'Entrada ' + (i + 1) + ' de ' + cantidad : 'Entrada individual';
+    return '' +
+    '<p style="font-size:13px; color:' + dim + '; margin:0 0 14px;">' + entradaLabel + '</p>' +
+    '<div style="background:#fff; padding:18px; border-radius:18px; display:inline-block; margin-bottom:20px; box-shadow:0 0 0 1px ' + neonDim + ', 0 0 34px ' + neonDim + ';">' +
+      '<img src="cid:' + t.cid + '" width="220" height="220" style="display:block;" alt="QR ' + escapeHtml_(t.ticketId) + '">' +
+    '</div>' +
+    '<div style="font-family:\'Courier New\',monospace; font-weight:700; font-size:24px; letter-spacing:0.04em; color:' + cream + '; margin-bottom:6px;">' + escapeHtml_(t.ticketId) + '</div>' +
+    '<p style="font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:' + dim + '; margin:0 0 36px;">C&oacute;digo &uacute;nico &mdash; presenta este QR en la entrada</p>';
+  }).join('');
 
   return '' +
-'<div style="background:' + night + ';padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">' +
-  '<div style="max-width:440px;margin:0 auto;background:' + night2 + ';border:1px solid ' + line + ';border-radius:22px;padding:34px 28px;text-align:center;color:' + cream + ';">' +
-    '<div style="display:inline-block;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;padding:6px 14px;border-radius:100px;border:1px solid ' + line + ';color:' + sun + ';margin-bottom:20px;">' + escapeHtml_(d.tipo) + ' &middot; #' + d.numero + '</div>' +
-    '<h1 style="font-size:22px;font-weight:800;margin:0 0 8px;">&iexcl;Ya tienes tu entrada!</h1>' +
-    '<p style="font-size:14px;line-height:1.6;color:' + creamDim + ';margin:0 0 24px;">Hola <strong style="color:' + cream + ';">' + escapeHtml_(d.nombre) + '</strong>, este es tu QR de acceso para <strong style="color:' + cream + ';">' + escapeHtml_(d.evento) + '</strong>. Presentalo en la entrada.</p>' +
-    '<div style="background:#fff;padding:16px;border-radius:16px;display:inline-block;margin-bottom:18px;">' +
-      '<img src="cid:' + cid + '" width="240" height="240" style="display:block;" alt="QR ' + escapeHtml_(d.ticketId) + '">' +
-    '</div>' +
-    '<div style="font-family:monospace;font-size:13px;color:' + creamDim + ';margin-bottom:26px;">' + escapeHtml_(d.ticketId) + '</div>' +
-    '<div style="border:1px solid ' + line + ';border-radius:14px;padding:16px 18px;background:rgba(247,241,228,0.04);text-align:left;">' +
-      '<p style="font-size:13px;line-height:1.7;margin:0;">Guarda este correo, es tu comprobante de entrada.</p>' +
-    '</div>' +
-    '<p style="margin-top:24px;font-size:12px;line-height:1.6;color:' + creamDim + ';opacity:0.75;">Si tienes alguna duda, contactanos por Instagram <strong>@fantribute_col</strong>.</p>' +
+'<div style="background:' + bg + '; padding:0 0 32px;">' +
+  '<div style="height:6px; background:' + neon + ';"></div>' +
+  '<div style="max-width:440px; margin:0 auto; padding:40px 24px 8px; text-align:center; font-family:Arial,Helvetica,sans-serif;">' +
+
+    '<p style="font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:' + neon + '; font-weight:700; margin:0 0 6px;">Fan Tribute &middot; ' + escapeHtml_(d.evento).toUpperCase() + '</p>' +
+    (info.sub ? '<p style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:' + dim + '; margin:0 0 24px;">' + info.sub + '</p>' : '') +
+
+    '<div style="display:inline-block; padding:8px 20px; border:1px solid ' + neon + '; border-radius:100px; color:' + neon + '; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:22px;">' + escapeHtml_(d.tipo) + '</div>' +
+
+    '<h1 style="font-size:26px; font-weight:800; color:' + cream + '; margin:0 0 28px; font-family:Georgia,\'Times New Roman\',serif;">' + escapeHtml_(d.nombre) + '</h1>' +
+
+    qrBlocks +
+
+    (cantidad > 1
+      ? '<p style="font-size:12px; line-height:1.7; color:' + dim + '; margin:0 0 28px;">Este correo trae ' + cantidad + ' c&oacute;digos QR &mdash; uno por persona. Cada uno se presenta por separado en la entrada.</p>'
+      : '') +
+
+    '<div style="height:1px; background:' + neonDim + '; margin:8px 0 20px;"></div>' +
+    (info.footer ? '<p style="font-size:12px; color:' + dim + '; margin:0;">' + info.footer + '</p>' : '') +
+    '<p style="font-size:11px; color:' + dim + '; opacity:0.7; margin-top:18px;">Dudas por Instagram <strong style="color:' + cream + ';">@fantribute_col</strong>.</p>' +
   '</div>' +
 '</div>';
 }
