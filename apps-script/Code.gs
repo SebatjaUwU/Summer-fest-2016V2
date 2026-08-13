@@ -373,16 +373,137 @@ function generateQrBlob_(ticketId) {
 }
 
 /**
+ * Arma la tarjeta completa del ticket (fondo, insignia, nombre, QR,
+ * codigo, fecha/venue) como una diapositiva de Google Slides y la
+ * exporta como PNG — asi el comprador puede guardar/reenviar el ticket
+ * como una sola imagen, no solo verlo dentro del correo.
+ *
+ * d: { evento, sub, tipo, nombre, entradaLabel, ticketId, footer, qrBlob }
+ */
+function generateTicketPng_(d) {
+  const WIDTH = 440, HEIGHT = 700;
+  const NIGHT = '#0B1F14', NEON = '#3DFF8B', CREAM = '#F5EFE0', DIM = '#8FA79B';
+
+  const pres = SlidesApp.create('tmp-ticket-' + Utilities.getUuid());
+  const presId = pres.getId();
+
+  try {
+    pres.setPageSize(WIDTH, HEIGHT);
+    const slide = pres.getSlides()[0];
+    slide.getShapes().forEach(function (s) {
+      try { s.remove(); } catch (e) { /* placeholder sin contenido, ignorar */ }
+    });
+
+    const bg = slide.insertShape(SlidesApp.ShapeType.RECTANGLE, 0, 0, WIDTH, HEIGHT);
+    bg.getFill().setSolidFill(NIGHT);
+    bg.getBorder().setTransparent();
+
+    const bar = slide.insertShape(SlidesApp.ShapeType.RECTANGLE, 0, 0, WIDTH, 8);
+    bar.getFill().setSolidFill(NEON);
+    bar.getBorder().setTransparent();
+
+    function addText(text, y, size, color, bold) {
+      const tb = slide.insertTextBox(text, 20, y, WIDTH - 40, size + 14);
+      tb.getFill().setTransparent();
+      tb.getBorder().setTransparent();
+      const tr = tb.getText();
+      tr.getTextStyle().setFontFamily('Arial').setFontSize(size).setBold(!!bold).setForegroundColor(color);
+      tr.getParagraphStyle().setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
+      return tb;
+    }
+
+    let y = 32;
+    addText('FAN TRIBUTE · ' + d.evento.toUpperCase(), y, 12, NEON, true);
+    y += 26;
+    if (d.sub) { addText(d.sub, y, 10, DIM, false); y += 26; }
+
+    const badgeW = 150, badgeH = 30;
+    const badge = slide.insertShape(SlidesApp.ShapeType.ROUND_RECTANGLE, (WIDTH - badgeW) / 2, y, badgeW, badgeH);
+    badge.getFill().setTransparent();
+    badge.getBorder().getLineFill().setSolidFill(NEON);
+    badge.getBorder().setWeight(1);
+    const badgeText = badge.getText();
+    badgeText.setText(d.tipo.toUpperCase());
+    badgeText.getTextStyle().setFontFamily('Arial').setFontSize(11).setBold(true).setForegroundColor(NEON);
+    badgeText.getParagraphStyle().setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
+    y += badgeH + 20;
+
+    addText(d.nombre, y, 22, CREAM, true);
+    y += 46;
+
+    addText(d.entradaLabel, y, 11, DIM, false);
+    y += 30;
+
+    const qrSize = 220, qrX = (WIDTH - qrSize) / 2, pad = 16;
+    const qrBg = slide.insertShape(SlidesApp.ShapeType.ROUND_RECTANGLE, qrX - pad, y - pad, qrSize + pad * 2, qrSize + pad * 2);
+    qrBg.getFill().setSolidFill('#FFFFFF');
+    qrBg.getBorder().setTransparent();
+    slide.insertImage(d.qrBlob, qrX, y, qrSize, qrSize);
+    y += qrSize + pad * 2 + 24;
+
+    addText(d.ticketId, y, 18, CREAM, true);
+    y += 32;
+    addText('CÓDIGO ÚNICO — PRESENTA ESTE QR EN LA ENTRADA', y, 8, DIM, false);
+    y += 40;
+
+    if (d.footer) addText(d.footer, HEIGHT - 46, 10, DIM, false);
+
+    pres.saveAndClose();
+
+    const slideId = slide.getObjectId();
+    const exportUrl = 'https://docs.google.com/presentation/d/' + presId + '/export/png?id=' + presId + '&pageid=' + slideId;
+    const resp = UrlFetchApp.fetch(exportUrl, {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+
+    if (resp.getResponseCode() !== 200) {
+      throw new Error('Export de Slides devolvio ' + resp.getResponseCode());
+    }
+
+    return resp.getBlob().setName(d.ticketId + '.png');
+  } finally {
+    DriveApp.getFileById(presId).setTrashed(true);
+  }
+}
+
+/**
  * d.tickets es un array de { numero, ticketId } — 1 elemento en una
  * compra normal, 2 o 3 en un combo. Cada uno trae su propio QR dentro
- * del mismo correo.
+ * del correo (HTML) y, ademas, su propia tarjeta completa como imagen
+ * PNG adjunta (para que se pueda guardar/reenviar suelta).
  */
 function sendTicketEmail_(d) {
+  const info = EVENT_INFO[d.evento] || { sub: '', footer: '' };
+  const cantidad = d.tickets.length;
   const inlineImages = {};
+  const attachments = [];
+
   const ticketsConCid = d.tickets.map(function (t, i) {
     const cid = 'qrcode' + i;
-    inlineImages[cid] = generateQrBlob_(t.ticketId);
-    return { numero: t.numero, ticketId: t.ticketId, cid: cid };
+    const qrBlob = generateQrBlob_(t.ticketId);
+    inlineImages[cid] = qrBlob;
+
+    const entradaLabel = cantidad > 1 ? 'Entrada ' + (i + 1) + ' de ' + cantidad : 'Entrada individual';
+
+    try {
+      attachments.push(generateTicketPng_({
+        evento: d.evento,
+        sub: info.sub,
+        tipo: d.tipo,
+        nombre: d.nombre,
+        entradaLabel: entradaLabel,
+        ticketId: t.ticketId,
+        footer: info.footer,
+        qrBlob: qrBlob
+      }));
+    } catch (pngErr) {
+      // Si falla el PNG, el correo sigue saliendo igual con el QR en el
+      // HTML — no se pierde el ticket, solo falta el adjunto.
+      Logger.log('No se pudo generar el PNG del ticket ' + t.ticketId + ': ' + pngErr);
+    }
+
+    return { numero: t.numero, ticketId: t.ticketId, cid: cid, entradaLabel: entradaLabel };
   });
 
   const html = buildEmailHtml_({
@@ -395,6 +516,7 @@ function sendTicketEmail_(d) {
   GmailApp.sendEmail(d.email, buildEmailSubject_(d), '', {
     htmlBody: html,
     inlineImages: inlineImages,
+    attachments: attachments,
     name: 'Fan Tribute'
   });
 }
@@ -411,10 +533,11 @@ function buildEmailSubject_(d) {
 }
 
 // Info fija del evento (fecha/venue), la misma que ya esta publicada en
-// end-of-summer-2.html / summer-2016.html. Solo se usa para el correo.
+// end-of-summer-2.html / summer-2016.html. Texto plano (UTF-8) — se usa
+// tanto en el HTML del correo como en la imagen PNG del ticket.
 const EVENT_INFO = {
-  'End of Summer': { sub: 'Segunda fecha &middot; Viernes 4 de septiembre', footer: 'Teatro Republik, Bogot&aacute; &middot; 9:00 p.m. &mdash; 3:00 a.m.' },
-  'Summer 2016':   { sub: 'Primera fecha &middot; 5 de septiembre',          footer: 'Teatro Republik, Bogot&aacute; &middot; 10:00 p.m. &mdash; 3:00 a.m.' }
+  'End of Summer': { sub: 'Segunda fecha · Viernes 4 de septiembre', footer: 'Teatro Republik, Bogotá · 9:00 p.m. — 3:00 a.m.' },
+  'Summer 2016':   { sub: 'Primera fecha · 5 de septiembre',         footer: 'Teatro Republik, Bogotá · 10:00 p.m. — 3:00 a.m.' }
 };
 
 function buildEmailHtml_(d) {
@@ -424,10 +547,9 @@ function buildEmailHtml_(d) {
   const info = EVENT_INFO[d.evento] || { sub: '', footer: '' };
   const cantidad = d.tickets.length;
 
-  const qrBlocks = d.tickets.map(function (t, i) {
-    const entradaLabel = cantidad > 1 ? 'Entrada ' + (i + 1) + ' de ' + cantidad : 'Entrada individual';
+  const qrBlocks = d.tickets.map(function (t) {
     return '' +
-    '<p style="font-size:13px; color:' + dim + '; margin:0 0 14px;">' + entradaLabel + '</p>' +
+    '<p style="font-size:13px; color:' + dim + '; margin:0 0 14px;">' + escapeHtml_(t.entradaLabel) + '</p>' +
     '<div style="background:#fff; padding:18px; border-radius:18px; display:inline-block; margin-bottom:20px; box-shadow:0 0 0 1px ' + neonDim + ', 0 0 34px ' + neonDim + ';">' +
       '<img src="cid:' + t.cid + '" width="220" height="220" style="display:block;" alt="QR ' + escapeHtml_(t.ticketId) + '">' +
     '</div>' +

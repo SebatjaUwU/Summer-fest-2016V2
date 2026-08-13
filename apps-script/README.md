@@ -36,7 +36,11 @@ de minutos.
 
 No hace falta agregar ningún "Servicio avanzado" en Apps Script — el
 código solo usa clases integradas (`GmailApp`, `SpreadsheetApp`,
-`UrlFetchApp`, `ContentService`, `Session`).
+`UrlFetchApp`, `ContentService`, `Session`, `SlidesApp`, `DriveApp`,
+`ScriptApp`). Como ahora usa `SlidesApp`/`DriveApp` (para generar el
+PNG del ticket, ver más abajo), la primera vez que corras
+`checkWompiSales` te va a pedir autorizar permisos nuevos — es normal,
+dale "Permitir" igual que la primera vez.
 
 ## Cómo detecta la venta
 
@@ -69,6 +73,27 @@ Definido en `LINK_MAP` dentro de `Code.gs`:
 
 Si se crea un nuevo Payment Link en Wompi, hay que agregar su `link_id`
 aquí para que el ticket quede bien clasificado.
+
+## El ticket llega también como imagen PNG adjunta
+
+Además del QR embebido en el cuerpo del correo, cada ticket se manda
+como una **imagen PNG adjunta** con la tarjeta completa (nombre,
+insignia, QR, código, fecha y venue) — así el comprador puede
+guardarla o reenviarla suelta (ej. por WhatsApp) sin depender de cómo
+se vea el correo en su cliente de email.
+
+`generateTicketPng_` arma la tarjeta usando Google Slides como lienzo
+(crea una presentación temporal, dibuja el diseño, la exporta como PNG,
+y borra la presentación), porque Apps Script no tiene un generador de
+imágenes propio. Si por algún motivo falla la generación del PNG (ej.
+un límite de cuota), el correo se manda igual con el QR en el HTML —
+solo faltaría el adjunto, no se pierde el ticket. Revisa "Ejecuciones"
+si ves ese caso.
+
+**Cuota:** cada ticket generado crea y borra un archivo de Slides en tu
+Drive — queda en la papelera (Drive la vacía sola con el tiempo). No
+debería ser un problema salvo que vendas cientos de tickets en un
+mismo día.
 
 ## Combos: varios tickets/QR en una sola compra
 
