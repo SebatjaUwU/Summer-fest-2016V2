@@ -290,6 +290,10 @@
   .ticket-grid3{ display:grid; grid-template-columns: repeat(3, 1fr); gap:22px; }
   @media (max-width:900px){ .ticket-grid3{ grid-template-columns:1fr; } }
 
+  .combo-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:22px; max-width:700px; margin:0 auto; }
+  @media (max-width:760px){ .combo-grid{ grid-template-columns:1fr; } }
+  .combo-note{ text-align:center; font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--cream-dim); opacity:0.75; margin-top:18px; }
+
   .ticket{
     position:relative; border-radius:20px; padding:32px 26px 28px; border:1px solid var(--line);
     background: linear-gradient(165deg, rgba(245,239,217,0.035), rgba(245,239,217,0.01));
@@ -702,6 +706,60 @@
         </div>
       </div>
     </div>
+
+    <div class="section-head" style="margin-top:54px;">
+      <div class="eyebrow">Ahorra en grupo</div>
+      <h2>Combos</h2>
+    </div>
+
+    <div class="combo-grid">
+
+      <!-- COMBO PREVENTA 2 (2 boletas) -->
+      <div class="ticket ticket--pv2" id="comboPv2Card">
+        <div class="ticket-top">
+          <div class="ticket-kind">Preventa 2</div>
+          <div class="ticket-tag">2 boletas</div>
+        </div>
+        <div class="ticket-price"><sup>$</sup>74K</div>
+        <div class="ticket-price-note">$37.000 c/u &middot; 2 boletas</div>
+
+        <hr class="perforation">
+        <ul class="ticket-feats">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>2 boletas de Preventa 2, mismo beneficio que individuales.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>$20.000 en consumibles incluidos por boleta.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Acceso a pista, primer y tercer piso.</span></li>
+        </ul>
+
+        <a class="buy-btn buy-btn--pv2" href="https://checkout.wompi.co/l/DaFT0V" target="_blank" rel="noopener" id="comboPv2BuyBtn">
+          Comprar combo x2
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- COMBO PREVENTA 3 (3 boletas) -->
+      <div class="ticket ticket--pv2" id="comboPv3Card">
+        <div class="ticket-top">
+          <div class="ticket-kind">Preventa 3</div>
+          <div class="ticket-tag">3 boletas</div>
+        </div>
+        <div class="ticket-price"><sup>$</sup>111K</div>
+        <div class="ticket-price-note">$37.000 c/u &middot; 3 boletas</div>
+
+        <hr class="perforation">
+        <ul class="ticket-feats">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>3 boletas de Preventa 2, mismo beneficio que individuales.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>$20.000 en consumibles incluidos por boleta.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Acceso a pista, primer y tercer piso.</span></li>
+        </ul>
+
+        <a class="buy-btn buy-btn--pv2" href="https://checkout.wompi.co/l/WgEtRz" target="_blank" rel="noopener" id="comboPv3BuyBtn">
+          Comprar combo x3
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+    </div>
+    <p class="combo-note">Precio = boletas × $37.000 (precio actual de Preventa 2). Cada combo se paga en una sola transacción de Wompi.</p>
   </div>
 </section>
 
