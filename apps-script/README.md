@@ -85,10 +85,14 @@ se vea el correo en su cliente de email.
 `generateTicketPng_` arma la tarjeta usando Google Slides como lienzo
 (crea una presentación temporal, dibuja el diseño, la exporta como PNG,
 y borra la presentación), porque Apps Script no tiene un generador de
-imágenes propio. Si por algún motivo falla la generación del PNG (ej.
-un límite de cuota), el correo se manda igual con el QR en el HTML —
-solo faltaría el adjunto, no se pierde el ticket. Revisa "Ejecuciones"
-si ves ese caso.
+imágenes propio. `SlidesApp` no permite fijar un tamaño de página
+personalizado (no hay `setPageSize`), así que el diseño usa el tamaño
+horizontal por defecto de una diapositiva nueva — por eso el ticket
+queda en formato horizontal (QR a la izquierda, datos a la derecha),
+no vertical como una boleta de celular. Si por algún motivo falla la
+generación del PNG (ej. un límite de cuota), el correo se manda igual
+con el QR en el HTML — solo faltaría el adjunto, no se pierde el
+ticket. Revisa "Ejecuciones" si ves ese caso.
 
 **Cuota:** cada ticket generado crea y borra un archivo de Slides en tu
 Drive — queda en la papelera (Drive la vacía sola con el tiempo). No

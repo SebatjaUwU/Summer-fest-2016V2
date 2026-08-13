@@ -381,14 +381,20 @@ function generateQrBlob_(ticketId) {
  * d: { evento, sub, tipo, nombre, entradaLabel, ticketId, footer, qrBlob }
  */
 function generateTicketPng_(d) {
-  const WIDTH = 440, HEIGHT = 700;
   const NIGHT = '#0B1F14', NEON = '#3DFF8B', CREAM = '#F5EFE0', DIM = '#8FA79B';
 
   const pres = SlidesApp.create('tmp-ticket-' + Utilities.getUuid());
   const presId = pres.getId();
 
   try {
-    pres.setPageSize(WIDTH, HEIGHT);
+    // SlidesApp no permite cambiar el tamaño de pagina (no hay
+    // setPageSize) — se usa el tamaño real de la diapositiva (horizontal
+    // por defecto) y el diseño se acomoda a eso en vez de forzar un
+    // formato vertical.
+    const WIDTH = pres.getPageWidth();
+    const HEIGHT = pres.getPageHeight();
+    const PAD = 36;
+
     const slide = pres.getSlides()[0];
     slide.getShapes().forEach(function (s) {
       try { s.remove(); } catch (e) { /* placeholder sin contenido, ignorar */ }
@@ -398,55 +404,67 @@ function generateTicketPng_(d) {
     bg.getFill().setSolidFill(NIGHT);
     bg.getBorder().setTransparent();
 
-    const bar = slide.insertShape(SlidesApp.ShapeType.RECTANGLE, 0, 0, WIDTH, 8);
+    const bar = slide.insertShape(SlidesApp.ShapeType.RECTANGLE, 0, 0, WIDTH, 6);
     bar.getFill().setSolidFill(NEON);
     bar.getBorder().setTransparent();
 
-    function addText(text, y, size, color, bold) {
-      const tb = slide.insertTextBox(text, 20, y, WIDTH - 40, size + 14);
+    function addText(text, x, y, w, size, color, bold, align) {
+      const tb = slide.insertTextBox(text, x, y, w, size + 14);
       tb.getFill().setTransparent();
       tb.getBorder().setTransparent();
       const tr = tb.getText();
       tr.getTextStyle().setFontFamily('Arial').setFontSize(size).setBold(!!bold).setForegroundColor(color);
-      tr.getParagraphStyle().setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
+      tr.getParagraphStyle().setParagraphAlignment(align || SlidesApp.ParagraphAlignment.START);
       return tb;
     }
 
-    let y = 32;
-    addText('FAN TRIBUTE · ' + d.evento.toUpperCase(), y, 12, NEON, true);
-    y += 26;
-    if (d.sub) { addText(d.sub, y, 10, DIM, false); y += 26; }
+    // Columna izquierda: QR grande centrado.
+    const qrColW = WIDTH * 0.4;
+    const qrSize = Math.min(qrColW - PAD * 2, HEIGHT - PAD * 2 - 30);
+    const qrX = (qrColW - qrSize) / 2;
+    const qrY = (HEIGHT - qrSize) / 2;
+    const pad = 14;
+    const qrBg = slide.insertShape(SlidesApp.ShapeType.ROUND_RECTANGLE, qrX - pad, qrY - pad, qrSize + pad * 2, qrSize + pad * 2);
+    qrBg.getFill().setSolidFill('#FFFFFF');
+    qrBg.getBorder().setTransparent();
+    slide.insertImage(d.qrBlob, qrX, qrY, qrSize, qrSize);
 
-    const badgeW = 150, badgeH = 30;
-    const badge = slide.insertShape(SlidesApp.ShapeType.ROUND_RECTANGLE, (WIDTH - badgeW) / 2, y, badgeW, badgeH);
+    const div = slide.insertShape(SlidesApp.ShapeType.RECTANGLE, qrColW, PAD, 1, HEIGHT - PAD * 2);
+    div.getFill().setSolidFill(NEON);
+    div.getBorder().setTransparent();
+
+    // Columna derecha: info del ticket.
+    const rx = qrColW + 40;
+    const rw = WIDTH - rx - PAD;
+    const LEFT = SlidesApp.ParagraphAlignment.START;
+
+    let y = PAD + 6;
+    addText('FAN TRIBUTE · ' + d.evento.toUpperCase(), rx, y, rw, 12, NEON, true, LEFT);
+    y += 22;
+    if (d.sub) { addText(d.sub, rx, y, rw, 10, DIM, false, LEFT); y += 22; }
+
+    const badgeW = Math.min(rw, 170), badgeH = 28;
+    const badge = slide.insertShape(SlidesApp.ShapeType.ROUND_RECTANGLE, rx, y, badgeW, badgeH);
     badge.getFill().setTransparent();
     badge.getBorder().getLineFill().setSolidFill(NEON);
     badge.getBorder().setWeight(1);
     const badgeText = badge.getText();
     badgeText.setText(d.tipo.toUpperCase());
-    badgeText.getTextStyle().setFontFamily('Arial').setFontSize(11).setBold(true).setForegroundColor(NEON);
+    badgeText.getTextStyle().setFontFamily('Arial').setFontSize(10).setBold(true).setForegroundColor(NEON);
     badgeText.getParagraphStyle().setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
-    y += badgeH + 20;
+    y += badgeH + 18;
 
-    addText(d.nombre, y, 22, CREAM, true);
-    y += 46;
-
-    addText(d.entradaLabel, y, 11, DIM, false);
-    y += 30;
-
-    const qrSize = 220, qrX = (WIDTH - qrSize) / 2, pad = 16;
-    const qrBg = slide.insertShape(SlidesApp.ShapeType.ROUND_RECTANGLE, qrX - pad, y - pad, qrSize + pad * 2, qrSize + pad * 2);
-    qrBg.getFill().setSolidFill('#FFFFFF');
-    qrBg.getBorder().setTransparent();
-    slide.insertImage(d.qrBlob, qrX, y, qrSize, qrSize);
-    y += qrSize + pad * 2 + 24;
-
-    addText(d.ticketId, y, 18, CREAM, true);
-    y += 32;
-    addText('CÓDIGO ÚNICO — PRESENTA ESTE QR EN LA ENTRADA', y, 8, DIM, false);
+    addText(d.nombre, rx, y, rw, 19, CREAM, true, LEFT);
     y += 40;
 
-    if (d.footer) addText(d.footer, HEIGHT - 46, 10, DIM, false);
+    addText(d.entradaLabel, rx, y, rw, 10, DIM, false, LEFT);
+    y += 26;
+
+    addText(d.ticketId, rx, y, rw, 17, CREAM, true, LEFT);
+    y += 28;
+    addText('CÓDIGO ÚNICO — PRESENTA ESTE QR EN LA ENTRADA', rx, y, rw, 8, DIM, false, LEFT);
+
+    if (d.footer) addText(d.footer, rx, HEIGHT - PAD - 20, rw, 9, DIM, false, LEFT);
 
     pres.saveAndClose();
 
