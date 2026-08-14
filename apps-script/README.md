@@ -27,12 +27,23 @@ de minutos.
    - Tipo de activador: **Temporizador por minutos**
    - Cada **5 minutos** (o el intervalo que prefieras — entre más corto,
      más rápido llega el QR, pero gasta más cuota de ejecuciones).
-5. (Opcional, para la página de confirmación dinámica) **Implementar →
-   Nueva implementación → Aplicación web**:
+5. (Para `confirmacion.html` y `escanear.html`, que llaman al script
+   desde el navegador) **Implementar → Nueva implementación →
+   Aplicación web**:
    - Ejecutar como: **Yo** (fantributeco@gmail.com)
    - Quién tiene acceso: **Cualquier usuario**
-   - Copia la URL que termina en `/exec` y pégala en
-     `APPS_SCRIPT_URL` dentro de `eventos/confirmacion.html`.
+   - Copia la URL que termina en `/exec` y pégala en `APPS_SCRIPT_URL`
+     dentro de `eventos/confirmacion.html` **y** `eventos/escanear.html`
+     (debe ser la misma URL en los dos archivos).
+
+**Importante — cada vez que cambies `Code.gs`:** guardar (`Ctrl+S`) no
+actualiza la URL `/exec` ya publicada. Para que `confirmacion.html` y
+`escanear.html` usen el código nuevo, tienes que **Implementar →
+Administrar implementaciones → ícono de lápiz en la implementación
+activa → Versión: Nueva versión → Implementar**. Si no haces esto, el
+navegador sigue hablando con el código viejo aunque en el editor ya
+esté actualizado — es la causa más común de "no me funciona" después
+de pegar un `Code.gs` nuevo.
 
 No hace falta agregar ningún "Servicio avanzado" en Apps Script — el
 código solo usa clases integradas (`GmailApp`, `SpreadsheetApp`,
@@ -111,18 +122,43 @@ monto que trae el correo de Wompi es el total del combo — se reparte
 entre los tickets generados para que la columna "Monto COP" siga
 representando el valor de cada ticket individual.
 
+## Escanear entradas en la puerta (eventos/escanear.html)
+
+Página para el staff de la entrada: abre la cámara del celular, lee el
+QR de cada ticket, y le pregunta a `doPost` del script si es válido.
+
+- **Primera vez que se escanea un código** → lo marca `Escaneado = true`
+  con la fecha/hora en la Sheet, y muestra en verde el nombre y tipo de
+  entrada.
+- **Ya estaba escaneado** → lo avisa en naranja con la hora del primer
+  ingreso (para detectar a alguien tratando de reusar el mismo QR).
+- **Código que no existe** → lo avisa en rojo.
+
+**PIN de staff (opcional pero recomendado):** sin PIN, cualquiera que
+tenga el link de `escanear.html` podría marcar tickets como usados
+antes de que lleguen los compradores reales. Para evitarlo, en Apps
+Script → **Configuración del proyecto ⚙️ → Propiedades de secuencia de
+comandos** agrega:
+  - `STAFF_PIN` = el PIN que le vas a dar al staff de la puerta.
+
+Si no configuras `STAFF_PIN`, la página funciona igual pero sin pedir
+PIN (útil para probar). Recuerda: como `doPost` es nuevo, después de
+pegar el `Code.gs` actualizado hay que **redesplegar** (ver la nota de
+arriba) para que `escanear.html` deje de fallar.
+
 ## Solo estos tipos se procesan automáticamente
 
 `AUTO_LINK_IDS` (al inicio de `Code.gs`) limita el flujo automático a
-`4VUCiA`, `R2amMy`, `DaFT0V` y `WgEtRz` (Preventa 2, General, y los
-combos x2/x3 de Preventa 2). VIP y Backstage son mesas y se coordinan a
-mano, así que aunque están en `LINK_MAP` (para que el sistema los
-reconozca y no los marque como error), el script **no** les genera
-ticket ni les manda correo — el hilo queda etiquetado `QR-Manual` en
-Gmail para que sepas que esa venta hay que atenderla tú directamente.
+`4VUCiA`, `R2amMy`, `DaFT0V`, `WgEtRz`, `eW6ari` y `Oophjg` — o sea,
+**todo End of Summer** (Preventa 2, General, VIP, Backstage, y los
+combos x2/x3 de Preventa 2). Cada tipo manda su QR con un color de
+acento distinto (`accentColorForTipo_` en `Code.gs`): verde para
+Preventa/General, dorado para VIP, cyan para Backstage.
 
-Si más adelante quieres automatizar también VIP/Backstage (o los links
-de Summer 2016), solo hay que agregar su `link_id` a `AUTO_LINK_IDS`.
+Los links de **Summer 2016** (`1oKPkP`, `URc8lu`, `djWZHo`) siguen
+fuera del flujo automático — quedan etiquetados `QR-Manual` en Gmail.
+Si más adelante también los quieres automatizar, agrega su `link_id` a
+`AUTO_LINK_IDS`.
 
 ## Si una venta no se pudo procesar sola
 

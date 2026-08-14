@@ -44,12 +44,11 @@ const HEADERS = [
   'Monto COP', 'Estado', 'Email enviado', 'Escaneado', 'Fecha escaneo'
 ];
 
-// Solo estos link_id se procesan automaticamente (Preventa 2, General, y
-// los combos x2/x3 de Preventa 2, todos de End of Summer). VIP y
-// Backstage son mesas — se coordinan a mano, no por QR automatico. Si
-// algun dia quieres sumar otro tipo al flujo automatico, agrega su
-// link_id aqui.
-const AUTO_LINK_IDS = ['4VUCiA', 'R2amMy', 'DaFT0V', 'WgEtRz'];
+// Solo estos link_id se procesan automaticamente (Preventa 2, General,
+// VIP, Backstage, y los combos x2/x3 de Preventa 2, todos de End of
+// Summer). Si algun dia quieres sumar otro tipo al flujo automatico
+// (ej. los de Summer 2016), agrega su link_id aqui.
+const AUTO_LINK_IDS = ['4VUCiA', 'R2amMy', 'DaFT0V', 'WgEtRz', 'eW6ari', 'Oophjg'];
 
 const LABEL_OK = 'QR-Procesado';
 const LABEL_REVIEW = 'QR-Revisar';
@@ -103,6 +102,64 @@ function doGet(e) {
 }
 
 /**
+ * Usado por eventos/escanear.html (el escaner de la entrada). Recibe
+ * { action: 'scan', ticketId, pin } por POST y marca el ticket como
+ * escaneado en la Sheet.
+ *
+ * Si STAFF_PIN esta configurado en Propiedades de secuencia de comandos,
+ * hay que mandarlo igual — asi nadie que solo vea el codigo QR (ej. en
+ * una foto) puede marcar tickets como usados sin estar en la puerta.
+ * Si no esta configurado, no se exige PIN (mas simple para probar).
+ */
+function doPost(e) {
+  let body;
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return jsonResponse_({ ok: false, status: 'peticion_invalida' });
+  }
+
+  if (body.action !== 'scan') {
+    return jsonResponse_({ ok: false, status: 'accion_desconocida' });
+  }
+
+  const staffPin = PropertiesService.getScriptProperties().getProperty('STAFF_PIN');
+  if (staffPin && body.pin !== staffPin) {
+    return jsonResponse_({ ok: false, status: 'pin_invalido' });
+  }
+
+  const ticketId = String(body.ticketId || '').trim();
+  if (!ticketId) {
+    return jsonResponse_({ ok: false, status: 'sin_codigo' });
+  }
+
+  const sheet = getSheet_();
+  const row = findRowByTicketId_(sheet, ticketId);
+  if (!row) {
+    return jsonResponse_({ ok: true, status: 'no_encontrado', ticketId: ticketId });
+  }
+
+  const values = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+  const yaEscaneado = values[13];
+
+  if (yaEscaneado) {
+    return jsonResponse_({
+      ok: true, status: 'ya_escaneado',
+      ticketId: ticketId, tipo: values[2], numero: values[3], nombre: values[7],
+      fechaEscaneo: values[14] ? new Date(values[14]).toISOString() : ''
+    });
+  }
+
+  sheet.getRange(row, 14).setValue(true);
+  sheet.getRange(row, 15).setValue(new Date());
+
+  return jsonResponse_({
+    ok: true, status: 'valido',
+    ticketId: ticketId, tipo: values[2], numero: values[3], nombre: values[7]
+  });
+}
+
+/**
  * Punto de entrada del trigger de tiempo. Busca correos de Wompi sin
  * procesar, genera el ticket + fila en la Sheet + email con QR por cada
  * uno, y los marca con una etiqueta de Gmail para no repetirlos.
@@ -149,9 +206,9 @@ function processWompiMessage_(message, thread, labelOk, labelReview, labelManual
   }
 
   if (AUTO_LINK_IDS.indexOf(parsed.linkId) === -1) {
-    // VIP, Backstage u otro tipo fuera del flujo automatico: no es un
-    // error, simplemente se coordina a mano. No se guarda en la Sheet
-    // ni se manda correo.
+    // Tipo fuera del flujo automatico (ej. los de Summer 2016): no es
+    // un error, simplemente se coordina a mano. No se guarda en la
+    // Sheet ni se manda correo.
     thread.addLabel(labelManual);
     return;
   }
@@ -337,6 +394,14 @@ function findRowByTransactionId_(sheet, txId) {
   return null;
 }
 
+function findRowByTicketId_(sheet, ticketId) {
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][4] === ticketId) return i + 1;
+  }
+  return null;
+}
+
 function getNextTicketNumber_(sheet, prefijo) {
   const data = sheet.getDataRange().getValues();
   let max = 0;
@@ -373,6 +438,25 @@ function generateQrBlob_(ticketId) {
 }
 
 /**
+ * Color de acento por tipo de entrada — verde para Pista (Preventa/
+ * General), dorado para VIP, cyan para Backstage. Se usa tanto en el
+ * PNG (Slides) como en el HTML del correo.
+ */
+function accentColorForTipo_(tipo) {
+  if (tipo === 'VIP') return '#F2B84B';
+  if (tipo === 'Backstage') return '#2DD9F0';
+  return '#3DFF8B';
+}
+
+function hexToRgba_(hex, alpha) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+/**
  * Arma la tarjeta completa del ticket (fondo, insignia, nombre, QR,
  * codigo, fecha/venue) como una diapositiva de Google Slides y la
  * exporta como PNG — asi el comprador puede guardar/reenviar el ticket
@@ -381,7 +465,7 @@ function generateQrBlob_(ticketId) {
  * d: { evento, sub, tipo, nombre, entradaLabel, ticketId, footer, qrBlob }
  */
 function generateTicketPng_(d) {
-  const NIGHT = '#0B1F14', NEON = '#3DFF8B', CREAM = '#F5EFE0', DIM = '#8FA79B';
+  const NIGHT = '#0B1F14', NEON = accentColorForTipo_(d.tipo), CREAM = '#F5EFE0', DIM = '#8FA79B';
 
   const pres = SlidesApp.create('tmp-ticket-' + Utilities.getUuid());
   const presId = pres.getId();
@@ -540,11 +624,11 @@ function sendTicketEmail_(d) {
 }
 
 /**
- * Solo Preventa 2 y General (End of Summer, la segunda fecha) usan el
- * asunto nuevo. El resto de tipos/eventos conserva el asunto anterior.
+ * Los tipos de End of Summer (la segunda fecha) usan el asunto nuevo.
+ * El resto de eventos (ej. Summer 2016) conserva el asunto anterior.
  */
 function buildEmailSubject_(d) {
-  if (d.evento === 'End of Summer' && (d.tipo === 'Preventa 2' || d.tipo === 'General')) {
+  if (d.evento === 'End of Summer') {
     return 'QR ' + d.tipo.toUpperCase() + ' SEGUNDA FECHA';
   }
   return 'Tu entrada para ' + d.evento + ' — ' + d.tipo;
@@ -559,7 +643,8 @@ const EVENT_INFO = {
 };
 
 function buildEmailHtml_(d) {
-  const bg = '#040E08', card = '#0B1F14', neon = '#3DFF8B', neonDim = 'rgba(61,255,139,0.35)',
+  const neon = accentColorForTipo_(d.tipo);
+  const bg = '#040E08', neonDim = hexToRgba_(neon, 0.35),
         cream = '#F5EFE0', dim = '#8FA79B';
 
   const info = EVENT_INFO[d.evento] || { sub: '', footer: '' };
