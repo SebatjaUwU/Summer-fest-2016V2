@@ -61,8 +61,13 @@ const GMAIL_SEARCH = 'from:(no-reply@wompi.co) "APROBADA" -label:' + LABEL_OK + 
  * reprocesa ventas viejas que ya estaban en la bandeja antes de activar
  * este sistema. Si alguna vez quieres reprocesar correos de antes,
  * cambia esta fecha hacia atras.
+ *
+ * TEMPORAL: bajada al 8 de agosto para poder reprocesar 3 ventas de
+ * VIP/Backstage del 9 y 11 de agosto cuyas filas se borraron de la
+ * Sheet. Despues de correr checkWompiSales una vez, hay que devolverla
+ * a su valor normal (revisa con Claude cual era antes de este cambio).
  */
-const IGNORE_BEFORE = new Date('2026-08-12T00:00:00');
+const IGNORE_BEFORE = new Date('2026-08-08T00:00:00');
 
 /**
  * Sin parametros: healthcheck ("OK").
@@ -157,6 +162,41 @@ function doPost(e) {
     ok: true, status: 'valido',
     ticketId: ticketId, tipo: values[2], numero: values[3], nombre: values[7]
   });
+}
+
+/**
+ * Utilidad manual (ejecutar una sola vez desde el editor, seleccionando
+ * esta funcion en el desplegable). Busca en la Sheet los tickets de VIP
+ * o Backstage cuyo correo nunca salio ("Email enviado" = FALSE) y se
+ * los reenvia con el diseno/colores actuales — sin generar un ticket
+ * nuevo ni duplicar la fila. Pensado para las ventas de VIP/Backstage
+ * de antes de activar la automatizacion, que quedaron en la Sheet pero
+ * sin correo por el bug del regex que ya se corrigio.
+ */
+function resendMissingVipBackstage_() {
+  const sheet = getSheet_();
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    const tipo = data[i][2];
+    const enviado = data[i][12];
+    if ((tipo === 'VIP' || tipo === 'Backstage') && !enviado) {
+      const row = i + 1;
+      try {
+        sendTicketEmail_({
+          email: data[i][8],
+          nombre: data[i][7],
+          evento: data[i][1],
+          tipo: tipo,
+          tickets: [{ numero: data[i][3], ticketId: data[i][4] }]
+        });
+        sheet.getRange(row, 13).setValue(true);
+        Logger.log('Reenviado: ' + data[i][4] + ' a ' + data[i][8]);
+      } catch (err) {
+        Logger.log('Fallo al reenviar ' + data[i][4] + ': ' + err);
+      }
+    }
+  }
 }
 
 /**
