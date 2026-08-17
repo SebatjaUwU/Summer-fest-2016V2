@@ -61,13 +61,8 @@ const GMAIL_SEARCH = 'from:(no-reply@wompi.co) "APROBADA" -label:' + LABEL_OK + 
  * reprocesa ventas viejas que ya estaban en la bandeja antes de activar
  * este sistema. Si alguna vez quieres reprocesar correos de antes,
  * cambia esta fecha hacia atras.
- *
- * TEMPORAL: bajada al 8 de agosto para poder reprocesar 3 ventas de
- * VIP/Backstage del 9 y 11 de agosto cuyas filas se borraron de la
- * Sheet. Despues de correr checkWompiSales una vez, hay que devolverla
- * a su valor normal (revisa con Claude cual era antes de este cambio).
  */
-const IGNORE_BEFORE = new Date('2026-08-08T00:00:00');
+const IGNORE_BEFORE = new Date('2026-08-12T00:00:00');
 
 /**
  * Sin parametros: healthcheck ("OK").
