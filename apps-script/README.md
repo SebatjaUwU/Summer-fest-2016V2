@@ -72,12 +72,12 @@ Definido en `LINK_MAP` dentro de `Code.gs`:
 
 | Evento         | Tipo                | link_id  | cantidad |
 |----------------|---------------------|----------|----------|
-| End of Summer  | Preventa 2          | 4VUCiA   | 1        |
+| End of Summer  | Preventa 2          | YZhBL1   | 1        |
 | End of Summer  | General             | R2amMy   | 1        |
 | End of Summer  | VIP                 | eW6ari   | 1        |
 | End of Summer  | Backstage           | Oophjg   | 1        |
-| End of Summer  | Preventa 2 (combo)  | DaFT0V   | 2        |
-| End of Summer  | Preventa 2 (combo)  | WgEtRz   | 3        |
+| End of Summer  | Preventa 2 (combo)  | J4Mtm3   | 2        |
+| End of Summer  | Preventa 2 (combo)  | 3ZjQTK   | 3        |
 | Summer 2016    | Preventa            | 1oKPkP   | 1        |
 | Summer 2016    | General             | URc8lu   | 1        |
 | Summer 2016    | VIP                 | djWZHo   | 1        |
@@ -112,7 +112,7 @@ mismo día.
 
 ## Combos: varios tickets/QR en una sola compra
 
-`DaFT0V` y `WgEtRz` son los combos de 2 y 3 boletas de Preventa 2. Como
+`J4Mtm3` y `3ZjQTK` son los combos de 2 y 3 boletas de Preventa 2. Como
 son **una sola transacción de Wompi** por varias boletas, `LINK_MAP`
 les puso `cantidad: 2` / `cantidad: 3` — el script genera esa cantidad
 de tickets (mismo prefijo `EOS-PV2`, se mezclan en la misma numeración
@@ -149,7 +149,7 @@ arriba) para que `escanear.html` deje de fallar.
 ## Solo estos tipos se procesan automáticamente
 
 `AUTO_LINK_IDS` (al inicio de `Code.gs`) limita el flujo automático a
-`4VUCiA`, `R2amMy`, `DaFT0V`, `WgEtRz`, `eW6ari` y `Oophjg` — o sea,
+`YZhBL1`, `R2amMy`, `J4Mtm3`, `3ZjQTK`, `eW6ari` y `Oophjg` — o sea,
 **todo End of Summer** (Preventa 2, General, VIP, Backstage, y los
 combos x2/x3 de Preventa 2). Cada tipo manda su QR con un color de
 acento distinto (`accentColorForTipo_` en `Code.gs`): verde para
