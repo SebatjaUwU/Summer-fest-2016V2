@@ -168,7 +168,7 @@ function doPost(e) {
  * de antes de activar la automatizacion, que quedaron en la Sheet pero
  * sin correo por el bug del regex que ya se corrigio.
  */
-function resendMissingVipBackstage_() {
+function resendMissingVipBackstage() {
   const sheet = getSheet_();
   const data = sheet.getDataRange().getValues();
 
@@ -237,7 +237,7 @@ function checkWompiSales() {
  * Ejecutar una sola vez desde el editor (seleccionala en el
  * desplegable) despues de reenviar los correos viejos a mano.
  */
-function processForwardedWompiEmails_() {
+function processForwardedWompiEmails() {
   const labelOk = getOrCreateLabel_(LABEL_OK);
   const labelReview = getOrCreateLabel_(LABEL_REVIEW);
   const labelOld = getOrCreateLabel_(LABEL_OLD);
