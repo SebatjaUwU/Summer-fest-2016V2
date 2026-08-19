@@ -224,6 +224,45 @@ function checkWompiSales() {
   });
 }
 
+/**
+ * Utilidad manual, de un solo uso: para correos de Wompi que se
+ * reenviaron A MANO desde otra cuenta (ej. cuando cambiaron la cuenta
+ * de Wompi a sebatja1234@gmail.com y hubo que reenviar a mano las
+ * ventas de antes de activar el filtro automatico). El reenvio manual
+ * cambia el remitente, asi que esta busqueda NO exige
+ * "from:no-reply@wompi.co" como si hace GMAIL_SEARCH — se apoya en que
+ * el asunto/cuerpo siguen intactos (parseWompiEmail_ igual exige
+ * encontrar "ref." en el asunto, asi que no procesa cualquier cosa).
+ *
+ * Ejecutar una sola vez desde el editor (seleccionala en el
+ * desplegable) despues de reenviar los correos viejos a mano.
+ */
+function processForwardedWompiEmails_() {
+  const labelOk = getOrCreateLabel_(LABEL_OK);
+  const labelReview = getOrCreateLabel_(LABEL_REVIEW);
+  const labelOld = getOrCreateLabel_(LABEL_OLD);
+  const labelManual = getOrCreateLabel_(LABEL_MANUAL);
+
+  const search = '"APROBADA" "ref." -label:' + LABEL_OK + ' -label:' + LABEL_REVIEW + ' -label:' + LABEL_OLD + ' -label:' + LABEL_MANUAL;
+  const threads = GmailApp.search(search, 0, 20);
+
+  threads.forEach(function (thread) {
+    thread.getMessages().forEach(function (message) {
+      if (message.getDate() < IGNORE_BEFORE) {
+        thread.addLabel(labelOld);
+        return;
+      }
+      try {
+        processWompiMessage_(message, thread, labelOk, labelReview, labelManual);
+      } catch (err) {
+        Logger.log('Error procesando correo reenviado "' + message.getSubject() + '": ' + err);
+        notifyReview_(message, String(err));
+        thread.addLabel(labelReview);
+      }
+    });
+  });
+}
+
 function processWompiMessage_(message, thread, labelOk, labelReview, labelManual) {
   const parsed = parseWompiEmail_(message);
 
