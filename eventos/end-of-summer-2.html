@@ -367,6 +367,7 @@
     transition: background 0.2s ease;
   }
   .combo-mini-btn:hover{ background: rgba(155,93,229,0.12); }
+  .combo-mini-btn.is-soldout{ pointer-events:none; cursor:not-allowed; opacity:0.5; }
 
   /* ---------- PREMIUM SPOTS ---------- */
   .premium{ padding: 90px 0 100px; }
@@ -712,10 +713,18 @@
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Válida toda la noche, 9:00 p.m. a 3:00 a.m.</span></li>
             </ul>
 
-            <a class="buy-btn buy-btn--gen" href="https://checkout.wompi.co/l/R2amMy" target="_blank" rel="noopener" id="genBuyBtn">
+            <a class="buy-btn buy-btn--gen" href="https://checkout.wompi.co/l/w69y3w" target="_blank" rel="noopener" id="genBuyBtn">
               Comprar General
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
             </a>
+
+            <div class="combo-mini">
+              <div class="combo-mini-label">En grupo</div>
+              <div class="combo-mini-row">
+                <a class="combo-mini-btn" href="https://checkout.wompi.co/l/1nkW4O" target="_blank" rel="noopener" id="comboGen2BuyBtn">x2 &middot; $80K</a>
+                <a class="combo-mini-btn" href="https://checkout.wompi.co/l/H9xF4f" target="_blank" rel="noopener" id="comboGen3BuyBtn">x3 &middot; $120K</a>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -961,13 +970,13 @@
   /* ---------- Stock / price system ---------- */
   const STOCK = {
     pv1: { total: 100, remaining: 0, lowThreshold: 8, unit: 'entrada' },
-    pv2: { total: 150, remaining: 150, lowThreshold: 15, unit: 'entrada' },
-    gen: { total: 250, remaining: 0, lowThreshold: 20, unit: 'entrada' },
+    pv2: { total: 150, remaining: 0, lowThreshold: 15, unit: 'entrada' },
+    gen: { total: 250, remaining: 250, lowThreshold: 20, unit: 'entrada' },
     vip: { total: 12, remaining: 0, lowThreshold: 3, unit: 'mesa' },
     backstage: { total: 6, remaining: 0, lowThreshold: 2, unit: 'mesa' }
   };
 
-  function renderDiscreetStock(key, elId, btnId, cardId, unavailableLabel){
+  function renderDiscreetStock(key, elId, btnId, cardId, unavailableLabel, comboBtnIds){
     const cfg = STOCK[key];
     const el = document.getElementById(elId);
     const btn = document.getElementById(btnId);
@@ -983,6 +992,10 @@
       btn.innerHTML = label;
       btn.removeAttribute('href');
       card.classList.add('is-soldout');
+      (comboBtnIds || []).forEach(function(id){
+        const cbtn = document.getElementById(id);
+        if(cbtn){ cbtn.classList.add('is-soldout'); cbtn.removeAttribute('href'); }
+      });
     } else if(remaining <= cfg.lowThreshold){
       el.classList.add('is-low');
       el.innerHTML = '<span class="stock-dot"></span> ¡Solo quedan ' + remaining + ' ' + plural + '!';
@@ -1018,8 +1031,8 @@
   }
 
   renderPv1();
-  renderDiscreetStock('pv2', 'pv2Stock', 'pv2BuyBtn', 'pv2Card', 'Muy pronto');
-  renderDiscreetStock('gen', 'genStock', 'genBuyBtn', 'genCard', 'Muy pronto');
+  renderDiscreetStock('pv2', 'pv2Stock', 'pv2BuyBtn', 'pv2Card', 'Agotado', ['comboPv2BuyBtn', 'comboPv3BuyBtn']);
+  renderDiscreetStock('gen', 'genStock', 'genBuyBtn', 'genCard', 'Muy pronto', ['comboGen2BuyBtn', 'comboGen3BuyBtn']);
   renderDiscreetStock('vip', 'vipStock', 'vipBuyBtn', 'vipCard');
   renderDiscreetStock('backstage', 'backstageStock', 'backstageBuyBtn', 'backstageCard');
 </script>

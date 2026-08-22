@@ -27,7 +27,7 @@
 // compra, y el correo trae un QR por cada uno.
 const LINK_MAP = {
   'YZhBL1': { evento: 'End of Summer', tipo: 'Preventa 2', prefijo: 'EOS-PV2' },
-  'R2amMy': { evento: 'End of Summer', tipo: 'General',    prefijo: 'EOS-GEN' },
+  'w69y3w': { evento: 'End of Summer', tipo: 'General',    prefijo: 'EOS-GEN' },
   'eW6ari': { evento: 'End of Summer', tipo: 'VIP',        prefijo: 'EOS-VIP' },
   'Oophjg': { evento: 'End of Summer', tipo: 'Backstage',  prefijo: 'EOS-BKS' },
   '1oKPkP': { evento: 'Summer 2016',   tipo: 'Preventa',   prefijo: 'S16-PRE' },
@@ -35,6 +35,8 @@ const LINK_MAP = {
   'djWZHo': { evento: 'Summer 2016',   tipo: 'VIP',        prefijo: 'S16-VIP' },
   'J4Mtm3': { evento: 'End of Summer', tipo: 'Preventa 2', prefijo: 'EOS-PV2', cantidad: 2 },
   '3ZjQTK': { evento: 'End of Summer', tipo: 'Preventa 2', prefijo: 'EOS-PV2', cantidad: 3 },
+  '1nkW4O': { evento: 'End of Summer', tipo: 'General',    prefijo: 'EOS-GEN', cantidad: 2 },
+  'H9xF4f': { evento: 'End of Summer', tipo: 'General',    prefijo: 'EOS-GEN', cantidad: 3 },
 };
 
 const SHEET_NAME = 'Repositorio QR';
@@ -48,7 +50,7 @@ const HEADERS = [
 // VIP, Backstage, y los combos x2/x3 de Preventa 2, todos de End of
 // Summer). Si algun dia quieres sumar otro tipo al flujo automatico
 // (ej. los de Summer 2016), agrega su link_id aqui.
-const AUTO_LINK_IDS = ['YZhBL1', 'R2amMy', 'J4Mtm3', '3ZjQTK', 'eW6ari', 'Oophjg'];
+const AUTO_LINK_IDS = ['YZhBL1', 'w69y3w', 'J4Mtm3', '3ZjQTK', 'eW6ari', 'Oophjg', '1nkW4O', 'H9xF4f'];
 
 const LABEL_OK = 'QR-Procesado';
 const LABEL_REVIEW = 'QR-Revisar';

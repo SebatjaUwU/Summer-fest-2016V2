@@ -73,11 +73,13 @@ Definido en `LINK_MAP` dentro de `Code.gs`:
 | Evento         | Tipo                | link_id  | cantidad |
 |----------------|---------------------|----------|----------|
 | End of Summer  | Preventa 2          | YZhBL1   | 1        |
-| End of Summer  | General             | R2amMy   | 1        |
+| End of Summer  | General             | w69y3w   | 1        |
 | End of Summer  | VIP                 | eW6ari   | 1        |
 | End of Summer  | Backstage           | Oophjg   | 1        |
 | End of Summer  | Preventa 2 (combo)  | J4Mtm3   | 2        |
 | End of Summer  | Preventa 2 (combo)  | 3ZjQTK   | 3        |
+| End of Summer  | General (combo)     | 1nkW4O   | 2        |
+| End of Summer  | General (combo)     | H9xF4f   | 3        |
 | Summer 2016    | Preventa            | 1oKPkP   | 1        |
 | Summer 2016    | General             | URc8lu   | 1        |
 | Summer 2016    | VIP                 | djWZHo   | 1        |
@@ -112,11 +114,13 @@ mismo día.
 
 ## Combos: varios tickets/QR en una sola compra
 
-`J4Mtm3` y `3ZjQTK` son los combos de 2 y 3 boletas de Preventa 2. Como
-son **una sola transacción de Wompi** por varias boletas, `LINK_MAP`
-les puso `cantidad: 2` / `cantidad: 3` — el script genera esa cantidad
-de tickets (mismo prefijo `EOS-PV2`, se mezclan en la misma numeración
-que las Preventa 2 individuales), una fila por ticket en la Sheet, y
+`J4Mtm3`/`3ZjQTK` son los combos de 2 y 3 boletas de Preventa 2, e
+`1nkW4O`/`H9xF4f` son lo mismo para General. Como son **una sola
+transacción de Wompi** por varias boletas, `LINK_MAP` les puso
+`cantidad: 2` / `cantidad: 3` — el script genera esa cantidad de
+tickets (mismo prefijo `EOS-PV2`/`EOS-GEN`, se mezclan en la misma
+numeración que las boletas individuales), una fila por ticket en la
+Sheet, y
 **un solo correo con varios códigos QR adentro** (uno por persona). El
 monto que trae el correo de Wompi es el total del combo — se reparte
 entre los tickets generados para que la columna "Monto COP" siga
@@ -149,11 +153,12 @@ arriba) para que `escanear.html` deje de fallar.
 ## Solo estos tipos se procesan automáticamente
 
 `AUTO_LINK_IDS` (al inicio de `Code.gs`) limita el flujo automático a
-`YZhBL1`, `R2amMy`, `J4Mtm3`, `3ZjQTK`, `eW6ari` y `Oophjg` — o sea,
-**todo End of Summer** (Preventa 2, General, VIP, Backstage, y los
-combos x2/x3 de Preventa 2). Cada tipo manda su QR con un color de
-acento distinto (`accentColorForTipo_` en `Code.gs`): verde para
-Preventa/General, dorado para VIP, cyan para Backstage.
+`YZhBL1`, `w69y3w`, `J4Mtm3`, `3ZjQTK`, `eW6ari`, `Oophjg`, `1nkW4O` y
+`H9xF4f` — o sea, **todo End of Summer** (Preventa 2, General, VIP,
+Backstage, y los combos x2/x3 de Preventa 2 y de General). Cada tipo
+manda su QR con un color de acento distinto (`accentColorForTipo_` en
+`Code.gs`): verde para Preventa/General, dorado para VIP, cyan para
+Backstage.
 
 Los links de **Summer 2016** (`1oKPkP`, `URc8lu`, `djWZHo`) siguen
 fuera del flujo automático — quedan etiquetados `QR-Manual` en Gmail.
