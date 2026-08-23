@@ -2,9 +2,10 @@
 
 `Code.gs` revisa periódicamente la bandeja de Gmail buscando los correos
 **"Transacción APROBADA"** que Wompi manda automáticamente por cada
-venta, asigna un ticket numerado por tipo (`EOS-GEN-004`, `S16-VIP-002`,
-etc.), lo guarda en una Google Sheet y envía el QR por Gmail al
-comprador.
+venta (directos, o reenviados a mano desde otra cuenta como
+sebatja1234@gmail.com), asigna un ticket numerado por tipo
+(`EOS-GEN-004`, `S16-VIP-002`, etc.), lo guarda en una Google Sheet y
+envía el QR por Gmail al comprador.
 
 No usa webhook de Wompi — no hace falta configurar nada en el dashboard
 de Wompi (ni "Eventos/Webhooks" ni un secreto). Todo se dispara desde un

@@ -1,8 +1,9 @@
 /**
  * Repositorio de QR — revisa periódicamente la bandeja de Gmail buscando
- * los correos "Transacción APROBADA" que Wompi manda automáticamente,
- * genera un ticket numerado por tipo, lo guarda en esta Sheet y envía el
- * QR por Gmail al comprador.
+ * los correos "Transacción APROBADA" que Wompi manda automáticamente
+ * (directos o reenviados a mano desde otra cuenta, ej.
+ * sebatja1234@gmail.com), genera un ticket numerado por tipo, lo guarda
+ * en esta Sheet y envía el QR por Gmail al comprador.
  *
  * No usa webhook de Wompi (no hace falta configurar nada en el dashboard
  * de Wompi ni guardar WOMPI_EVENTS_SECRET). Todo se dispara desde un
@@ -57,6 +58,16 @@ const LABEL_REVIEW = 'QR-Revisar';
 const LABEL_OLD = 'QR-Anterior';
 const LABEL_MANUAL = 'QR-Manual';
 const GMAIL_SEARCH = 'from:(no-reply@wompi.co) "APROBADA" -label:' + LABEL_OK + ' -label:' + LABEL_REVIEW + ' -label:' + LABEL_OLD + ' -label:' + LABEL_MANUAL;
+
+// Correos reenviados a mano (ej. desde sebatja1234@gmail.com, la cuenta
+// donde le llegan las notificaciones de Wompi). El reenvio cambia el
+// remitente, asi que esta busqueda no exige "from:no-reply@wompi.co"
+// como si hace GMAIL_SEARCH -- se apoya en que el asunto/cuerpo siguen
+// intactos (parseWompiEmail_ igual exige encontrar "ref." en el
+// asunto, asi que no procesa cualquier cosa). Se excluye
+// "from:no-reply@wompi.co" para no volver a buscar los correos que ya
+// cubre GMAIL_SEARCH en la misma pasada.
+const FORWARDED_SEARCH = '"APROBADA" "ref." -from:no-reply@wompi.co -label:' + LABEL_OK + ' -label:' + LABEL_REVIEW + ' -label:' + LABEL_OLD + ' -label:' + LABEL_MANUAL;
 
 /**
  * Ignora cualquier correo de Wompi anterior a esta fecha/hora — asi no
@@ -198,8 +209,10 @@ function resendMissingVipBackstage() {
 
 /**
  * Punto de entrada del trigger de tiempo. Busca correos de Wompi sin
- * procesar, genera el ticket + fila en la Sheet + email con QR por cada
- * uno, y los marca con una etiqueta de Gmail para no repetirlos.
+ * procesar (directos de no-reply@wompi.co Y reenviados a mano desde
+ * otra cuenta, ej. sebatja1234@gmail.com), genera el ticket + fila en
+ * la Sheet + email con QR por cada uno, y los marca con una etiqueta de
+ * Gmail para no repetirlos.
  */
 function checkWompiSales() {
   const labelOk = getOrCreateLabel_(LABEL_OK);
@@ -207,7 +220,12 @@ function checkWompiSales() {
   const labelOld = getOrCreateLabel_(LABEL_OLD);
   const labelManual = getOrCreateLabel_(LABEL_MANUAL);
 
-  const threads = GmailApp.search(GMAIL_SEARCH, 0, 20);
+  processGmailSearch_(GMAIL_SEARCH, labelOk, labelReview, labelOld, labelManual);
+  processGmailSearch_(FORWARDED_SEARCH, labelOk, labelReview, labelOld, labelManual);
+}
+
+function processGmailSearch_(searchQuery, labelOk, labelReview, labelOld, labelManual) {
+  const threads = GmailApp.search(searchQuery, 0, 20);
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (message) {
@@ -227,17 +245,11 @@ function checkWompiSales() {
 }
 
 /**
- * Utilidad manual, de un solo uso: para correos de Wompi que se
- * reenviaron A MANO desde otra cuenta (ej. cuando cambiaron la cuenta
- * de Wompi a sebatja1234@gmail.com y hubo que reenviar a mano las
- * ventas de antes de activar el filtro automatico). El reenvio manual
- * cambia el remitente, asi que esta busqueda NO exige
- * "from:no-reply@wompi.co" como si hace GMAIL_SEARCH — se apoya en que
- * el asunto/cuerpo siguen intactos (parseWompiEmail_ igual exige
- * encontrar "ref." en el asunto, asi que no procesa cualquier cosa).
- *
- * Ejecutar una sola vez desde el editor (seleccionala en el
- * desplegable) despues de reenviar los correos viejos a mano.
+ * Utilidad manual: procesa solo los correos reenviados a mano (mismo
+ * filtro que la segunda mitad de checkWompiSales). Ya no hace falta
+ * ejecutarla despues de cada reenvio porque el trigger automatico
+ * tambien cubre FORWARDED_SEARCH — se deja por si alguna vez quieres
+ * forzar el procesamiento sin esperar al siguiente disparo del trigger.
  */
 function processForwardedWompiEmails() {
   const labelOk = getOrCreateLabel_(LABEL_OK);
@@ -245,24 +257,7 @@ function processForwardedWompiEmails() {
   const labelOld = getOrCreateLabel_(LABEL_OLD);
   const labelManual = getOrCreateLabel_(LABEL_MANUAL);
 
-  const search = '"APROBADA" "ref." -label:' + LABEL_OK + ' -label:' + LABEL_REVIEW + ' -label:' + LABEL_OLD + ' -label:' + LABEL_MANUAL;
-  const threads = GmailApp.search(search, 0, 20);
-
-  threads.forEach(function (thread) {
-    thread.getMessages().forEach(function (message) {
-      if (message.getDate() < IGNORE_BEFORE) {
-        thread.addLabel(labelOld);
-        return;
-      }
-      try {
-        processWompiMessage_(message, thread, labelOk, labelReview, labelManual);
-      } catch (err) {
-        Logger.log('Error procesando correo reenviado "' + message.getSubject() + '": ' + err);
-        notifyReview_(message, String(err));
-        thread.addLabel(labelReview);
-      }
-    });
-  });
+  processGmailSearch_(FORWARDED_SEARCH, labelOk, labelReview, labelOld, labelManual);
 }
 
 function processWompiMessage_(message, thread, labelOk, labelReview, labelManual) {
