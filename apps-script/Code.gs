@@ -509,13 +509,15 @@ function generateQrBlob_(ticketId) {
 }
 
 /**
- * Color de acento por tipo de entrada — verde para Pista (Preventa/
- * General), dorado para VIP, cyan para Backstage. Se usa tanto en el
- * PNG (Slides) como en el HTML del correo.
+ * Color de acento por tipo de entrada — verde para Preventa/Preventa 2,
+ * azul para General (mismo azul que su botón en la web), dorado para
+ * VIP, cyan para Backstage. Se usa tanto en el PNG (Slides) como en el
+ * HTML del correo.
  */
 function accentColorForTipo_(tipo) {
   if (tipo === 'VIP') return '#F2B84B';
   if (tipo === 'Backstage') return '#2DD9F0';
+  if (tipo === 'General') return '#2E6FF2';
   return '#3DFF8B';
 }
 
