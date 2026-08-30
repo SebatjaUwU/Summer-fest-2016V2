@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Escanear entradas — Fan Tribute</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --night: #070E17;
+    --night-2: #0E1E30;
+    --cream: #F7F1E4;
+    --cream-dim: #C9C2B2;
+    --line: rgba(247,241,228,0.14);
+    --ok: #3DFF8B;
+    --warn: #F9B233;
+    --bad: #FF4D6D;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    background: var(--night);
+    color: var(--cream);
+    font-family:'Space Grotesk', sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  header{
+    width:100%; max-width:520px; padding:18px 20px 10px; text-align:center;
+  }
+  header h1{
+    font-family:'Unbounded', sans-serif; font-weight:800; font-size:16px;
+    letter-spacing:0.04em; text-transform:uppercase;
+  }
+  header p{ font-size:11px; color:var(--cream-dim); margin-top:4px; font-family:'JetBrains Mono', monospace; }
+
+  /* ---------- Pantalla de PIN ---------- */
+  #pinScreen{
+    width:100%; max-width:340px; margin:auto; padding:24px; text-align:center;
+  }
+  #pinScreen p{ font-size:13px; color:var(--cream-dim); margin-bottom:16px; line-height:1.6; }
+  #pinInput{
+    width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--line);
+    background:rgba(247,241,228,0.05); color:var(--cream); font-size:22px; text-align:center;
+    letter-spacing:0.3em; font-family:'JetBrains Mono', monospace; margin-bottom:14px;
+  }
+  #pinInput:focus{ outline:none; border-color:var(--ok); }
+  .btn{
+    display:block; width:100%; padding:14px 20px; border-radius:12px; border:none;
+    font-family:'Unbounded', sans-serif; font-weight:700; font-size:12.5px; letter-spacing:0.04em;
+    text-transform:uppercase; cursor:pointer;
+    background: linear-gradient(90deg, var(--ok), #1FA6E0); color:#06120C;
+  }
+  .btn-ghost{
+    background:transparent; border:1px solid var(--line); color:var(--cream-dim); margin-top:10px;
+  }
+
+  /* ---------- Pantalla de escaner ---------- */
+  #scanScreen{ display:none; width:100%; max-width:520px; flex:1; display:flex; flex-direction:column; align-items:center; padding:0 16px 24px; }
+  #scanScreen.show{ display:flex; }
+
+  #reader{
+    width:100%; max-width:420px; border-radius:20px; overflow:hidden; border:1px solid var(--line);
+    background:#000;
+  }
+
+  #resultBanner{
+    width:100%; max-width:420px; margin-top:16px; border-radius:16px; padding:18px 20px;
+    text-align:center; border:1px solid var(--line); background:rgba(247,241,228,0.03);
+    min-height:64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  }
+  #resultBanner.ok{ border-color:var(--ok); background:rgba(61,255,139,0.08); }
+  #resultBanner.warn{ border-color:var(--warn); background:rgba(249,178,51,0.1); }
+  #resultBanner.bad{ border-color:var(--bad); background:rgba(255,77,109,0.1); }
+
+  #resultStatus{
+    font-family:'Unbounded', sans-serif; font-weight:800; font-size:14px; letter-spacing:0.04em; text-transform:uppercase;
+  }
+  #resultBanner.ok #resultStatus{ color:var(--ok); }
+  #resultBanner.warn #resultStatus{ color:var(--warn); }
+  #resultBanner.bad #resultStatus{ color:var(--bad); }
+
+  #resultDetail{ font-size:13.5px; color:var(--cream); margin-top:2px; }
+  #resultSub{ font-size:11px; color:var(--cream-dim); font-family:'JetBrains Mono', monospace; margin-top:2px; }
+
+  #counter{
+    margin-top:12px; font-size:11px; color:var(--cream-dim); font-family:'JetBrains Mono', monospace;
+  }
+
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Escanear entradas</h1>
+  <p>Fan Tribute · Punto de acceso</p>
+</header>
+
+<div id="pinScreen">
+  <p>Ingresa el PIN de staff para activar el escáner (si el evento no configuró uno, deja el campo vacío y continúa).</p>
+  <input type="password" inputmode="numeric" id="pinInput" placeholder="····" maxlength="12">
+  <button class="btn" id="pinContinueBtn">Entrar</button>
+</div>
+
+<div id="scanScreen">
+  <div id="reader"></div>
+  <div id="resultBanner">
+    <div id="resultStatus">Apunta la cámara al QR de la entrada</div>
+    <div id="resultDetail"></div>
+    <div id="resultSub"></div>
+  </div>
+  <div id="counter">0 escaneados en esta sesión</div>
+  <button class="btn btn-ghost" id="changePinBtn">Cambiar PIN</button>
+</div>
+
+<script>
+  (function () {
+    var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzC_PFimumlNMUWRRTJZ-7uoMsZAdGrhVZToWFTPsh4H2c_FjBX7uh35btjzOFk3WoIwg/exec';
+    var PIN_KEY = 'ft_staff_pin';
+    var scanCount = 0;
+    var busy = false;
+    var html5QrCode = null;
+
+    var pinScreen = document.getElementById('pinScreen');
+    var scanScreen = document.getElementById('scanScreen');
+    var pinInput = document.getElementById('pinInput');
+    var banner = document.getElementById('resultBanner');
+    var statusEl = document.getElementById('resultStatus');
+    var detailEl = document.getElementById('resultDetail');
+    var subEl = document.getElementById('resultSub');
+    var counterEl = document.getElementById('counter');
+
+    function showScanner() {
+      pinScreen.classList.add('hidden');
+      scanScreen.classList.add('show');
+      startScanner();
+    }
+
+    document.getElementById('pinContinueBtn').addEventListener('click', function () {
+      sessionStorage.setItem(PIN_KEY, pinInput.value.trim());
+      showScanner();
+    });
+
+    document.getElementById('changePinBtn').addEventListener('click', function () {
+      if (html5QrCode) { html5QrCode.stop().catch(function () {}); }
+      scanScreen.classList.remove('show');
+      pinScreen.classList.remove('hidden');
+      pinInput.value = sessionStorage.getItem(PIN_KEY) || '';
+      pinInput.focus();
+    });
+
+    function setBanner(kind, status, detail, sub) {
+      banner.className = kind;
+      statusEl.textContent = status;
+      detailEl.textContent = detail || '';
+      subEl.textContent = sub || '';
+    }
+
+    function startScanner() {
+      html5QrCode = new Html5Qrcode('reader');
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 240 },
+        onScanSuccess,
+        function () { /* frames sin QR, ignorar */ }
+      ).catch(function (err) {
+        setBanner('bad', 'No se pudo abrir la cámara', String(err), 'Revisa los permisos de cámara del navegador');
+      });
+    }
+
+    function onScanSuccess(ticketId) {
+      if (busy) return;
+      busy = true;
+      html5QrCode.pause(true);
+      validarTicket(ticketId);
+    }
+
+    function validarTicket(ticketId) {
+      setBanner('', 'Verificando…', ticketId, '');
+
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'scan',
+          ticketId: ticketId,
+          pin: sessionStorage.getItem(PIN_KEY) || ''
+        })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) { mostrarResultado(ticketId, data); })
+        .catch(function () {
+          setBanner('bad', 'Error de conexión', ticketId, 'Reintenta en unos segundos');
+          reanudar();
+        });
+    }
+
+    function mostrarResultado(ticketId, data) {
+      if (!data.ok) {
+        if (data.status === 'pin_invalido') {
+          setBanner('bad', 'PIN incorrecto', '', 'Toca "Cambiar PIN" para corregirlo');
+        } else {
+          setBanner('bad', 'Error', ticketId, data.status || '');
+        }
+        reanudar();
+        return;
+      }
+
+      if (data.status === 'no_encontrado') {
+        setBanner('bad', 'Código no encontrado', data.ticketId, 'No existe en el Repositorio QR');
+      } else if (data.status === 'ya_escaneado') {
+        var fecha = data.fechaEscaneo ? new Date(data.fechaEscaneo).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '';
+        setBanner('warn', 'Ya escaneado', (data.nombre || '') + ' · ' + (data.tipo || '') + ' #' + (data.numero || ''), fecha ? 'Primer ingreso a las ' + fecha : '');
+      } else if (data.status === 'valido') {
+        scanCount++;
+        counterEl.textContent = scanCount + ' escaneados en esta sesión';
+        setBanner('ok', '✓ Entrada válida', (data.nombre || '') + ' · ' + (data.tipo || '') + ' #' + (data.numero || ''), data.ticketId);
+      }
+
+      reanudar();
+    }
+
+    function reanudar() {
+      setTimeout(function () {
+        busy = false;
+        if (html5QrCode) { html5QrCode.resume(); }
+      }, 1800);
+    }
+  })();
+</script>
+
+</body>
+</html>
