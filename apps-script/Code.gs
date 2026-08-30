@@ -763,3 +763,195 @@ function escapeHtml_(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+/* =========================================================================
+ * IMPORTAR TICKETS VENDIDOS "A MANO" (correo directo, sin Wompi/webhook)
+ * =========================================================================
+ * Estas entradas se vendieron mandando el QR por Gmail directamente, con
+ * tres asuntos distintos (sin prefijo comun):
+ *   General:  "END OF SUMMER: QR GENERAL"
+ *   VIP:      "VIP EN OF SUMMER"          (el emoji del asunto real no
+ *                                           importa, subject: hace match parcial)
+ *   Preventa: "QRs de PREVENTA END OF SUMMER"
+ *
+ * Para que estos tickets se puedan validar en la puerta con el MISMO
+ * escaner (eventos/escanear.html + doPost de arriba), hay que agregarlos
+ * como filas nuevas a la Sheet "Repositorio QR" con el mismo formato que
+ * usa appendRow_(). Una vez ahi, escanear.html los reconoce sin tocar nada
+ * mas.
+ *
+ * SUPUESTOS (verificalos con diagnosticarImportacionManualQR_ primero):
+ *   1. Este script corre en la cuenta de Gmail que MANDO esos correos
+ *      (fantributeco@gmail.com). GmailApp solo puede leer/buscar en la
+ *      cuenta due単a del proyecto de Apps Script — si el que mando los
+ *      correos fue OTRA cuenta, hay que pegar esta funcion en el proyecto
+ *      de Apps Script de esa otra cuenta (y ahi si necesitas abrir esta
+ *      misma Sheet con SpreadsheetApp.openById('ID_DE_LA_SHEET') en vez
+ *      de getSheet_(), porque no van a estar en el mismo proyecto).
+ *   2. El codigo del ticket (ej. "EOS-GN-225") es el NOMBRE DEL ARCHIVO
+ *      adjunto sin la extension (ej. "EOS-GN-225.png" -> "EOS-GN-225").
+ *      Si el archivo se llama distinto (ej. "imagen.png" generico), esto
+ *      no va a funcionar y toca ajustar extraerTicketIdDeAdjunto_().
+ *   3. El nombre del comprador se intenta sacar del header "To" del
+ *      correo (formato "Nombre <correo@x.com>"); si Gmail no guardo el
+ *      nombre, queda como "Sin nombre" y hay que completarlo a mano en
+ *      la Sheet despues.
+ */
+
+var IMPORT_MANUAL_SEARCH_ =
+  'in:sent (' +
+  'subject:"END OF SUMMER: QR GENERAL" OR ' +
+  'subject:"VIP EN OF SUMMER" OR ' +
+  'subject:"QRs de PREVENTA END OF SUMMER"' +
+  ')';
+
+/**
+ * Clasifica el tipo de entrada segun palabras clave en el asunto.
+ * (Misma logica que se uso en el script de conteo de la fase 1.)
+ */
+function clasificarTipoManual_(asunto) {
+  var s = (asunto || '').toUpperCase();
+  if (s.indexOf('PREVENTA') !== -1) return 'Preventa';
+  if (s.indexOf('VIP') !== -1) return 'VIP';
+  if (s.indexOf('GENERAL') !== -1) return 'General';
+  return 'Otro';
+}
+
+/**
+ * Saca "Nombre" y "email" del header To de un mensaje. msg.getTo() puede
+ * traer varios destinatarios separados por coma; solo se usa el primero
+ * (normal en un correo de un ticket a un solo comprador).
+ */
+function extraerDestinatario_(msg) {
+  var to = (msg.getTo() || '').split(',')[0].trim();
+  var match = to.match(/^(.*)<(.+)>$/);
+  if (match) {
+    var nombre = match[1].replace(/["']/g, '').trim();
+    return { nombre: nombre || 'Sin nombre', email: match[2].trim() };
+  }
+  return { nombre: 'Sin nombre', email: to };
+}
+
+/**
+ * Codigo del ticket = nombre del archivo adjunto sin extension.
+ * Devuelve null si el adjunto no tiene pinta de imagen (para no colar
+ * un PDF de factura o algo asi como si fuera el codigo del QR).
+ */
+function extraerTicketIdDeAdjunto_(attachment) {
+  var nombre = attachment.getName() || '';
+  if (!/\.(png|jpe?g|webp)$/i.test(nombre)) return null;
+  return nombre.replace(/\.(png|jpe?g|webp)$/i, '').trim();
+}
+
+/**
+ * PASO 1 — Solo lectura. Corre esto primero y revisa el log (Ver >
+ * Registros de ejecucion) antes de importar nada de verdad. Muestra,
+ * por cada correo encontrado: asunto, tipo detectado, a quien se mando,
+ * y el/los codigo(s) de ticket que se van a sacar de los adjuntos.
+ */
+function diagnosticarImportacionManualQR_() {
+  const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 50);
+  Logger.log('Hilos encontrados: ' + threads.length);
+
+  let totalMensajes = 0, totalAdjuntosValidos = 0, sinAdjuntoValido = 0;
+
+  threads.forEach(function (thread) {
+    thread.getMessages().forEach(function (msg) {
+      totalMensajes++;
+      const tipo = clasificarTipoManual_(msg.getSubject());
+      const destinatario = extraerDestinatario_(msg);
+      const codigos = msg.getAttachments()
+        .map(extraerTicketIdDeAdjunto_)
+        .filter(function (c) { return c; });
+
+      if (codigos.length === 0) sinAdjuntoValido++;
+      totalAdjuntosValidos += codigos.length;
+
+      Logger.log(
+        '[' + tipo + '] "' + msg.getSubject() + '" -> ' +
+        destinatario.nombre + ' <' + destinatario.email + '> -> ' +
+        'codigos: [' + codigos.join(', ') + ']'
+      );
+    });
+  });
+
+  Logger.log('--- RESUMEN ---');
+  Logger.log('Mensajes: ' + totalMensajes);
+  Logger.log('Codigos de ticket detectados: ' + totalAdjuntosValidos);
+  Logger.log('Mensajes sin ningun adjunto valido: ' + sinAdjuntoValido);
+}
+
+/**
+ * PASO 2 — Escribe de verdad. Agrega una fila en "Repositorio QR" por
+ * cada codigo de ticket nuevo (salta los que ya existan en la Sheet, asi
+ * que se puede correr varias veces sin duplicar). Quedan con
+ * Escaneado = false, listos para validarse en la puerta con
+ * escanear.html igual que los tickets vendidos por Wompi.
+ */
+function importarCorreosManualQR() {
+  const sheet = getSheet_();
+  const data = sheet.getDataRange().getValues();
+  const existentes = {};
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][4]) existentes[data[i][4]] = true;
+  }
+
+  const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 50);
+  let nuevos = 0, duplicados = 0, sinAdjuntoValido = 0;
+
+  threads.forEach(function (thread) {
+    thread.getMessages().forEach(function (msg) {
+      const tipo = clasificarTipoManual_(msg.getSubject());
+      const destinatario = extraerDestinatario_(msg);
+      const codigos = msg.getAttachments()
+        .map(extraerTicketIdDeAdjunto_)
+        .filter(function (c) { return c; });
+
+      if (codigos.length === 0) { sinAdjuntoValido++; return; }
+
+      codigos.forEach(function (ticketId) {
+        if (existentes[ticketId]) { duplicados++; return; }
+
+        sheet.appendRow([
+          msg.getDate(), 'End of Summer', tipo, '', ticketId,
+          'MANUAL', msg.getSubject(), destinatario.nombre, destinatario.email, '',
+          '', 'pagado', true, false, ''
+        ]);
+        existentes[ticketId] = true;
+        nuevos++;
+      });
+    });
+  });
+
+  Logger.log('Importados: ' + nuevos + ' | Duplicados (ya existian): ' + duplicados + ' | Correos sin adjunto valido: ' + sinAdjuntoValido);
+}
+
+/**
+ * UTILIDAD APARTE — no tiene que ver con el import de arriba, es solo
+ * para responder "que tanto tengo ya en la Sheet". Cuenta cuantas filas
+ * hay por Evento + Tipo de entrada (y cuantas ya estan escaneadas), asi
+ * puedes ver de una si "Summer 2016" (primera fecha) esta completo o si
+ * falta cargar algo, sin tener que contar filas a mano en el Sheet.
+ */
+function resumenTicketsPorEvento_() {
+  const sheet = getSheet_();
+  const data = sheet.getDataRange().getValues();
+  const resumen = {};
+
+  for (let i = 1; i < data.length; i++) {
+    const evento = data[i][1] || '(sin evento)';
+    const tipo = data[i][2] || '(sin tipo)';
+    const escaneado = data[i][13];
+    const key = evento + ' — ' + tipo;
+    if (!resumen[key]) resumen[key] = { total: 0, escaneados: 0 };
+    resumen[key].total++;
+    if (escaneado) resumen[key].escaneados++;
+  }
+
+  Logger.log('--- TICKETS EN "Repositorio QR" POR EVENTO Y TIPO ---');
+  Object.keys(resumen).sort().forEach(function (key) {
+    const r = resumen[key];
+    Logger.log(key + ': ' + r.total + ' tickets (' + r.escaneados + ' ya escaneados)');
+  });
+  Logger.log('Total filas: ' + (data.length - 1));
+}
