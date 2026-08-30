@@ -823,15 +823,27 @@ var IMPORT_MANUAL_SEARCH_ =
   ')';
 
 /**
- * Clasifica el tipo de entrada segun palabras clave en el asunto.
- * (Misma logica que se uso en el script de conteo de la fase 1.)
+ * Traduce el prefijo de tipo dentro del codigo (la parte entre "EOS-" y
+ * el numero, ej. "GN" en "EOS-GN-208") a un nombre legible para la
+ * columna "Tipo de entrada" de la Sheet.
+ *
+ * IMPORTANTE: el tipo se saca del CODIGO, no del asunto del correo. En
+ * el diagnostico real se vio que el asunto miente -- hay tickets VIP
+ * (ej. "EOS-VIP-008") mandados dentro de correos cuyo asunto dice
+ * literalmente "END OF SUMMER: QR GENERAL" (la gente reenvio/copio el
+ * mismo asunto para todo). Clasificar por asunto habria marcado esas
+ * mesas VIP como "General" en la Sheet.
  */
-function clasificarTipoManual_(asunto) {
-  var s = (asunto || '').toUpperCase();
-  if (s.indexOf('PREVENTA') !== -1) return 'Preventa';
-  if (s.indexOf('VIP') !== -1) return 'VIP';
-  if (s.indexOf('GENERAL') !== -1) return 'General';
-  return 'Otro';
+var TIPO_POR_PREFIJO_ = {
+  GN: 'General', GEN: 'General',
+  VIP: 'VIP',
+  BKS: 'Backstage', BACKSTAGE: 'Backstage',
+  PV: 'Preventa', PV1: 'Preventa 1', PV2: 'Preventa 2', PRE: 'Preventa'
+};
+
+function tipoPorPrefijo_(prefijo) {
+  var p = (prefijo || '').toUpperCase();
+  return TIPO_POR_PREFIJO_[p] || ('Otro (' + p + ')');
 }
 
 /**
@@ -862,7 +874,11 @@ function extraerEmailDestinatario_(msg) {
  *                                             igual; no es parte del
  *                                             nombre ni del codigo.
  *
- * O sea: "{Nombre con espacios como _}[_fechaN][_neon][_NdeM]_EOS[-_]TIPO[-_]NUMERO[.ext][ (n)]"
+ * O sea: "{Nombre con espacios como _}[_fechaN][_neon][_NdeM][_tipo]_EOS[-_]TIPO[-_]NUMERO[.ext][ (n)]"
+ *
+ * (el "[_tipo]" es porque algunos tambien traen la palabra del tipo
+ * pegada al nombre, ej. "Mayra_A_Espitia_M_vip_EOS-VIP-008.png" ->
+ * sin la limpieza el nombre quedaria "Mayra A Espitia M vip")
  *
  * Devuelve null si el nombre del archivo no tiene un codigo tipo
  * "EOS-XXX-123" reconocible (asi no cuela adjuntos que no son tickets,
@@ -875,20 +891,23 @@ function parseAdjuntoTicket_(attachment) {
   var m = base.match(/EOS[-_]([A-Za-z]{1,6})[-_](\d+)/i);
   if (!m) return null;
 
-  var ticketId = 'EOS-' + m[1].toUpperCase() + '-' + m[2];
+  var prefijo = m[1].toUpperCase();
+  var ticketId = 'EOS-' + prefijo + '-' + m[2];
+  var tipo = tipoPorPrefijo_(prefijo);
 
   var partesNombre = base.substring(0, m.index).split('_').filter(function (p) { return p !== ''; });
   // quita sufijos conocidos que no son parte del nombre (pueden venir
-  // encadenados, ej. "..._fecha2_neon_EOS...", por eso el while)
+  // encadenados, ej. "..._fecha2_neon_EOS..." o "..._vip_EOS...", por
+  // eso el while)
   while (
     partesNombre.length &&
-    /^(fecha\d+|neon|\d+de\d+)$/i.test(partesNombre[partesNombre.length - 1])
+    /^(fecha\d+|neon|\d+de\d+|general|vip|backstage|preventa\d*|pv\d*)$/i.test(partesNombre[partesNombre.length - 1])
   ) {
     partesNombre.pop();
   }
 
   var nombre = partesNombre.join(' ').trim();
-  return { ticketId: ticketId, nombre: nombre || 'Sin nombre' };
+  return { ticketId: ticketId, tipo: tipo, nombre: nombre || 'Sin nombre' };
 }
 
 /**
@@ -907,11 +926,12 @@ function diagnosticarImportacionManualQR() {
 
   let totalMensajes = 0, totalTicketsValidos = 0, sinAdjuntoValido = 0;
   const porTipo = {};
+  const vistos = {}; // ticketId -> nombre (para detectar choques)
+  const conflictos = [];
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       totalMensajes++;
-      const tipo = clasificarTipoManual_(msg.getSubject());
       const email = extraerEmailDestinatario_(msg);
       const tickets = msg.getAttachments()
         .map(parseAdjuntoTicket_)
@@ -919,10 +939,17 @@ function diagnosticarImportacionManualQR() {
 
       if (tickets.length === 0) { sinAdjuntoValido++; return; }
       totalTicketsValidos += tickets.length;
-      porTipo[tipo] = (porTipo[tipo] || 0) + tickets.length;
 
-      const detalle = tickets.map(function (t) { return t.ticketId + ' (' + t.nombre + ')'; }).join(', ');
-      Logger.log('[' + tipo + '] "' + msg.getSubject() + '" -> ' + email + ' -> ' + detalle);
+      tickets.forEach(function (t) {
+        porTipo[t.tipo] = (porTipo[t.tipo] || 0) + 1;
+        if (vistos[t.ticketId] && vistos[t.ticketId] !== t.nombre) {
+          conflictos.push(t.ticketId + ': "' + vistos[t.ticketId] + '" vs "' + t.nombre + '"');
+        }
+        vistos[t.ticketId] = t.nombre;
+      });
+
+      const detalle = tickets.map(function (t) { return t.ticketId + ' [' + t.tipo + '] (' + t.nombre + ')'; }).join(', ');
+      Logger.log('"' + msg.getSubject() + '" -> ' + email + ' -> ' + detalle);
     });
   });
 
@@ -933,6 +960,13 @@ function diagnosticarImportacionManualQR() {
     Logger.log('  ' + tipo + ': ' + porTipo[tipo]);
   });
   Logger.log('Mensajes sin ningun ticket valido en sus adjuntos: ' + sinAdjuntoValido);
+
+  if (conflictos.length) {
+    Logger.log('--- ⚠ CONFLICTOS: mismo Ticket ID con nombres distintos (revisar a mano antes de importar) ---');
+    conflictos.forEach(function (c) { Logger.log('  ' + c); });
+  } else {
+    Logger.log('Sin conflictos de Ticket ID repetido con nombre distinto.');
+  }
 }
 
 /**
@@ -952,10 +986,11 @@ function importarCorreosManualQR() {
 
   const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 500);
   let nuevos = 0, duplicados = 0, sinAdjuntoValido = 0;
+  const nombrePorId = {}; // para poder avisar de conflictos tambien aqui
+  const conflictos = [];
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
-      const tipo = clasificarTipoManual_(msg.getSubject());
       const email = extraerEmailDestinatario_(msg);
       const tickets = msg.getAttachments()
         .map(parseAdjuntoTicket_)
@@ -964,18 +999,30 @@ function importarCorreosManualQR() {
       if (tickets.length === 0) { sinAdjuntoValido++; return; }
 
       tickets.forEach(function (t) {
-        if (existentes[t.ticketId]) { duplicados++; return; }
+        if (existentes[t.ticketId]) {
+          duplicados++;
+          if (nombrePorId[t.ticketId] && nombrePorId[t.ticketId] !== t.nombre) {
+            conflictos.push(t.ticketId + ': se quedo con "' + nombrePorId[t.ticketId] + '", se ignoro "' + t.nombre + '"');
+          }
+          return;
+        }
 
         sheet.appendRow([
-          msg.getDate(), 'End of Summer', tipo, '', t.ticketId,
+          msg.getDate(), 'End of Summer', t.tipo, '', t.ticketId,
           'MANUAL', msg.getSubject(), t.nombre, email, '',
           '', 'pagado', true, false, ''
         ]);
         existentes[t.ticketId] = true;
+        nombrePorId[t.ticketId] = t.nombre;
         nuevos++;
       });
     });
   });
+
+  if (conflictos.length) {
+    Logger.log('--- ⚠ CONFLICTOS: se importó solo la primera persona vista para cada Ticket ID repetido — revisa y corrige a mano en la Sheet ---');
+    conflictos.forEach(function (c) { Logger.log('  ' + c); });
+  }
 
   Logger.log('Importados: ' + nuevos + ' | Duplicados (ya existian): ' + duplicados + ' | Correos sin ningun ticket valido: ' + sinAdjuntoValido);
 }
