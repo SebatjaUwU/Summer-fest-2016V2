@@ -711,7 +711,7 @@ function buildEmailSubject_(d) {
 // end-of-summer-2.html / summer-2016.html. Texto plano (UTF-8) — se usa
 // tanto en el HTML del correo como en la imagen PNG del ticket.
 const EVENT_INFO = {
-  'End of Summer': { sub: 'Segunda fecha · Viernes 2 de octubre', footer: 'Teatro Republik, Bogotá · 9:00 p.m. — 3:00 a.m.' },
+  'End of Summer': { sub: 'Segunda fecha · Viernes 4 de septiembre', footer: 'Teatro Republik, Bogotá · 9:00 p.m. — 3:00 a.m.' },
   'Summer 2016':   { sub: 'Primera fecha · 5 de septiembre',         footer: 'Teatro Republik, Bogotá · 10:00 p.m. — 3:00 a.m.' }
 };
 
