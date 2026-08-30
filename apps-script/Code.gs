@@ -911,120 +911,143 @@ function parseAdjuntoTicket_(attachment) {
 }
 
 /**
- * PASO 1 — Solo lectura. Corre esto primero y revisa el log (Ver >
- * Registros de ejecucion) antes de importar nada de verdad. Muestra,
- * por cada correo encontrado: asunto, tipo detectado, email del
- * comprador, y el/los ticket(s) [codigo + nombre] que se van a sacar de
- * los adjuntos.
+ * Recorre todos los correos manuales UNA vez y arma un mapa
+ * { ticketId -> {ticketId, tipo, nombre, email, fecha, asunto} } quedandose,
+ * por cada codigo, con el mensaje MAS RECIENTE.
  *
- * El limite de busqueda es 500 hilos -- si "Hilos encontrados" sale
- * exactamente 500, probablemente hay mas y hay que subir el numero.
+ * Por que "el mas reciente gana" y no "el primero que aparece": estas
+ * boletas se revenden -- el comprador original le pasa el ticket a otra
+ * persona y se reenvia el mismo QR con el nombre del nuevo dueño. El
+ * reenvio (mas nuevo) es quien va a estar parado en la puerta esa
+ * noche, asi que es el que debe quedar en la Sheet.
+ *
+ * Comparten esta funcion diagnosticarImportacionManualQR() e
+ * importarCorreosManualQR(), asi los dos ven exactamente lo mismo (y
+ * solo se busca en Gmail una vez). onMensaje (opcional) se llama por
+ * cada correo con tickets validos, para loguear sin repetir la busqueda.
  */
-function diagnosticarImportacionManualQR() {
+function recolectarTicketsManuales_(onMensaje) {
   const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 500);
-  Logger.log('Hilos encontrados: ' + threads.length);
-
-  let totalMensajes = 0, totalTicketsValidos = 0, sinAdjuntoValido = 0;
-  const porTipo = {};
-  const vistos = {}; // ticketId -> nombre (para detectar choques)
-  const conflictos = [];
+  const porId = {};
+  const historial = {}; // ticketId -> [nombres vistos en orden] (solo para loguear reventas)
+  let totalMensajes = 0, sinAdjuntoValido = 0;
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       totalMensajes++;
       const email = extraerEmailDestinatario_(msg);
+      const fecha = msg.getDate();
       const tickets = msg.getAttachments()
         .map(parseAdjuntoTicket_)
         .filter(function (t) { return t; });
 
       if (tickets.length === 0) { sinAdjuntoValido++; return; }
-      totalTicketsValidos += tickets.length;
+      if (onMensaje) onMensaje(msg, email, tickets);
 
       tickets.forEach(function (t) {
-        porTipo[t.tipo] = (porTipo[t.tipo] || 0) + 1;
-        if (vistos[t.ticketId] && vistos[t.ticketId] !== t.nombre) {
-          conflictos.push(t.ticketId + ': "' + vistos[t.ticketId] + '" vs "' + t.nombre + '"');
-        }
-        vistos[t.ticketId] = t.nombre;
-      });
+        if (!historial[t.ticketId]) historial[t.ticketId] = [];
+        if (historial[t.ticketId].indexOf(t.nombre) === -1) historial[t.ticketId].push(t.nombre);
 
-      const detalle = tickets.map(function (t) { return t.ticketId + ' [' + t.tipo + '] (' + t.nombre + ')'; }).join(', ');
-      Logger.log('"' + msg.getSubject() + '" -> ' + email + ' -> ' + detalle);
+        const actual = porId[t.ticketId];
+        if (!actual || fecha > actual.fecha) {
+          porId[t.ticketId] = {
+            ticketId: t.ticketId, tipo: t.tipo, nombre: t.nombre,
+            email: email, fecha: fecha, asunto: msg.getSubject()
+          };
+        }
+      });
     });
   });
 
-  Logger.log('--- RESUMEN ---');
-  Logger.log('Mensajes: ' + totalMensajes);
-  Logger.log('Tickets detectados: ' + totalTicketsValidos);
-  Object.keys(porTipo).sort().forEach(function (tipo) {
-    Logger.log('  ' + tipo + ': ' + porTipo[tipo]);
-  });
-  Logger.log('Mensajes sin ningun ticket valido en sus adjuntos: ' + sinAdjuntoValido);
+  const revendidos = Object.keys(historial).filter(function (id) { return historial[id].length > 1; });
 
-  if (conflictos.length) {
-    Logger.log('--- ⚠ CONFLICTOS: mismo Ticket ID con nombres distintos (revisar a mano antes de importar) ---');
-    conflictos.forEach(function (c) { Logger.log('  ' + c); });
+  return {
+    porId: porId, historial: historial, revendidos: revendidos,
+    totalMensajes: totalMensajes, sinAdjuntoValido: sinAdjuntoValido,
+    hilos: threads.length
+  };
+}
+
+/**
+ * PASO 1 — Solo lectura. Corre esto primero y revisa el log (Ver >
+ * Registros de ejecucion) antes de importar nada de verdad. Muestra,
+ * por cada correo encontrado: asunto, email del comprador, y el/los
+ * ticket(s) [codigo + tipo + nombre]. Al final lista los codigos que se
+ * vieron con mas de un nombre (reventas) y con cual se va a quedar.
+ */
+function diagnosticarImportacionManualQR() {
+  const r = recolectarTicketsManuales_(function (msg, email, tickets) {
+    const detalle = tickets.map(function (t) { return t.ticketId + ' [' + t.tipo + '] (' + t.nombre + ')'; }).join(', ');
+    Logger.log(Utilities.formatDate(msg.getDate(), Session.getScriptTimeZone(), 'yyyy-MM-dd') + ' "' + msg.getSubject() + '" -> ' + email + ' -> ' + detalle);
+  });
+  Logger.log('Hilos encontrados: ' + r.hilos);
+
+  const porTipo = {};
+  Object.keys(r.porId).forEach(function (id) { porTipo[r.porId[id].tipo] = (porTipo[r.porId[id].tipo] || 0) + 1; });
+
+  Logger.log('--- RESUMEN ---');
+  Logger.log('Mensajes: ' + r.totalMensajes);
+  Logger.log('Tickets unicos detectados: ' + Object.keys(r.porId).length);
+  Object.keys(porTipo).sort().forEach(function (tipo) { Logger.log('  ' + tipo + ': ' + porTipo[tipo]); });
+  Logger.log('Mensajes sin ningun ticket valido en sus adjuntos: ' + r.sinAdjuntoValido);
+
+  if (r.revendidos.length) {
+    Logger.log('--- 🔁 REVENDIDOS: mismo Ticket ID visto con mas de un nombre (se queda con el mas reciente) ---');
+    r.revendidos.forEach(function (id) {
+      Logger.log('  ' + id + ': ' + r.historial[id].join(' -> ') + '  => queda: "' + r.porId[id].nombre + '"');
+    });
   } else {
-    Logger.log('Sin conflictos de Ticket ID repetido con nombre distinto.');
+    Logger.log('Sin reventas detectadas (ningun Ticket ID con mas de un nombre).');
   }
 }
 
 /**
- * PASO 2 — Escribe de verdad. Agrega una fila en "Repositorio QR" por
- * cada ticket nuevo (salta los que ya existan en la Sheet por Ticket ID,
- * asi se puede correr varias veces sin duplicar). Quedan con
- * Escaneado = false, listos para validarse en la puerta con
- * escanear.html igual que los tickets vendidos por Wompi.
+ * PASO 2 — Escribe de verdad en "Repositorio QR". Por cada ticket:
+ *   - Si el codigo NO esta en la Sheet, agrega una fila nueva.
+ *   - Si YA esta pero con un nombre/email distinto (reventa que se
+ *     proceso en una corrida anterior con la logica vieja, o una
+ *     reventa nueva), ACTUALIZA esa fila con el nombre/email actual en
+ *     vez de dejarla como estaba. No duplica filas.
+ * Se puede correr las veces que haga falta -- cada vez deja la Sheet al
+ * dia con el ultimo reenvio visto en Gmail.
  */
 function importarCorreosManualQR() {
   const sheet = getSheet_();
   const data = sheet.getDataRange().getValues();
-  const existentes = {};
+  const filaPorId = {}; // ticketId -> numero de fila (1-indexed, con encabezado)
   for (let i = 1; i < data.length; i++) {
-    if (data[i][4]) existentes[data[i][4]] = true;
+    if (data[i][4]) filaPorId[data[i][4]] = i + 1;
   }
 
-  const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 500);
-  let nuevos = 0, duplicados = 0, sinAdjuntoValido = 0;
-  const nombrePorId = {}; // para poder avisar de conflictos tambien aqui
-  const conflictos = [];
+  const r = recolectarTicketsManuales_();
+  let nuevos = 0, actualizados = 0, sinCambios = 0;
 
-  threads.forEach(function (thread) {
-    thread.getMessages().forEach(function (msg) {
-      const email = extraerEmailDestinatario_(msg);
-      const tickets = msg.getAttachments()
-        .map(parseAdjuntoTicket_)
-        .filter(function (t) { return t; });
+  Object.keys(r.porId).forEach(function (ticketId) {
+    const t = r.porId[ticketId];
+    const fila = filaPorId[ticketId];
 
-      if (tickets.length === 0) { sinAdjuntoValido++; return; }
+    if (!fila) {
+      sheet.appendRow([
+        t.fecha, 'End of Summer', t.tipo, '', t.ticketId,
+        'MANUAL', t.asunto, t.nombre, t.email, '',
+        '', 'pagado', true, false, ''
+      ]);
+      nuevos++;
+      return;
+    }
 
-      tickets.forEach(function (t) {
-        if (existentes[t.ticketId]) {
-          duplicados++;
-          if (nombrePorId[t.ticketId] && nombrePorId[t.ticketId] !== t.nombre) {
-            conflictos.push(t.ticketId + ': se quedo con "' + nombrePorId[t.ticketId] + '", se ignoro "' + t.nombre + '"');
-          }
-          return;
-        }
-
-        sheet.appendRow([
-          msg.getDate(), 'End of Summer', t.tipo, '', t.ticketId,
-          'MANUAL', msg.getSubject(), t.nombre, email, '',
-          '', 'pagado', true, false, ''
-        ]);
-        existentes[t.ticketId] = true;
-        nombrePorId[t.ticketId] = t.nombre;
-        nuevos++;
-      });
-    });
+    const nombreActual = sheet.getRange(fila, 8).getValue();
+    if (nombreActual !== t.nombre) {
+      sheet.getRange(fila, 8).setValue(t.nombre); // columna H = Nombre
+      sheet.getRange(fila, 9).setValue(t.email);  // columna I = Email
+      Logger.log('Actualizado ' + ticketId + ' (reventa/reenvio): "' + nombreActual + '" -> "' + t.nombre + '"');
+      actualizados++;
+    } else {
+      sinCambios++;
+    }
   });
 
-  if (conflictos.length) {
-    Logger.log('--- ⚠ CONFLICTOS: se importó solo la primera persona vista para cada Ticket ID repetido — revisa y corrige a mano en la Sheet ---');
-    conflictos.forEach(function (c) { Logger.log('  ' + c); });
-  }
-
-  Logger.log('Importados: ' + nuevos + ' | Duplicados (ya existian): ' + duplicados + ' | Correos sin ningun ticket valido: ' + sinAdjuntoValido);
+  Logger.log('Nuevos: ' + nuevos + ' | Actualizados por reventa/reenvio: ' + actualizados + ' | Sin cambios: ' + sinCambios + ' | Mensajes: ' + r.totalMensajes + ' | Sin ticket valido: ' + r.sinAdjuntoValido);
 }
 
 /**
