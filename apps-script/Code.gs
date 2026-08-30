@@ -780,22 +780,39 @@ function escapeHtml_(s) {
  * usa appendRow_(). Una vez ahi, escanear.html los reconoce sin tocar nada
  * mas.
  *
- * SUPUESTOS (verificalos con diagnosticarImportacionManualQR primero):
+ * Confirmado con diagnosticarImportacionManualQR (26-ago): estos SI son
+ * de END OF SUMMER (viernes, segunda fecha) — el codigo real dentro del
+ * nombre del adjunto usa el prefijo "EOS-GN-###" (a veces con guion
+ * bajo: "EOS_GN_###"), NO el "EOS-GEN-###" de 3 letras que usa el
+ * sistema automatico de Wompi. Son dos lotes de tickets con formato de
+ * codigo distinto, asi que no chocan entre si.
+ *
+ * El nombre del archivo adjunto real (visto en el diagnostico) es mucho
+ * mas rico de lo que se penso al principio: no es solo el codigo, trae
+ * el nombre completo del comprador Y a veces varias personas por correo
+ * (compras "en grupo"), ej. un solo correo a jorgeandrestl123@gmail.com
+ * con 3 adjuntos: Kevin_..._EOS-GN-087, Javier_..._EOS-GN-086,
+ * Jorge_..._EOS-GN-085 — cada uno con SU propio nombre. Por eso el
+ * nombre se saca del nombre del archivo (parseAdjuntoTicket_), no del
+ * header "To" del correo (que solo tiene el email del comprador, y a
+ * veces ni el nombre).
+ *
+ * SUPUESTOS que quedan (verificalos con diagnosticarImportacionManualQR
+ * si algo no cuadra):
  *   1. Este script corre en la cuenta de Gmail que MANDO esos correos
  *      (fantributeco@gmail.com). GmailApp solo puede leer/buscar en la
- *      cuenta due単a del proyecto de Apps Script — si el que mando los
+ *      cuenta dueña del proyecto de Apps Script — si el que mando los
  *      correos fue OTRA cuenta, hay que pegar esta funcion en el proyecto
  *      de Apps Script de esa otra cuenta (y ahi si necesitas abrir esta
  *      misma Sheet con SpreadsheetApp.openById('ID_DE_LA_SHEET') en vez
  *      de getSheet_(), porque no van a estar en el mismo proyecto).
- *   2. El codigo del ticket (ej. "EOS-GN-225") es el NOMBRE DEL ARCHIVO
- *      adjunto sin la extension (ej. "EOS-GN-225.png" -> "EOS-GN-225").
- *      Si el archivo se llama distinto (ej. "imagen.png" generico), esto
- *      no va a funcionar y toca ajustar extraerTicketIdDeAdjunto_().
- *   3. El nombre del comprador se intenta sacar del header "To" del
- *      correo (formato "Nombre <correo@x.com>"); si Gmail no guardo el
- *      nombre, queda como "Sin nombre" y hay que completarlo a mano en
- *      la Sheet despues.
+ *   2. Los acentos/ñ que se perdieron al nombrar el archivo original
+ *      (ej. "Nicol_s_Toro" en vez de "Nicolás Toro") NO se pueden
+ *      recuperar automaticamente — quedan asi en la Sheet, se pueden
+ *      corregir a mano si hace falta para la puerta.
+ *   3. El limite de busqueda es 500 hilos — si algun dia "Hilos
+ *      encontrados" da justo 500, hay mas correos de los que se estan
+ *      trayendo y toca subir el numero en las dos funciones de abajo.
  */
 
 var IMPORT_MANUAL_SEARCH_ =
@@ -818,73 +835,110 @@ function clasificarTipoManual_(asunto) {
 }
 
 /**
- * Saca "Nombre" y "email" del header To de un mensaje. msg.getTo() puede
- * traer varios destinatarios separados por coma; solo se usa el primero
- * (normal en un correo de un ticket a un solo comprador).
+ * Saca el email del header To de un mensaje (solo el primero, si hay
+ * varios separados por coma). El NOMBRE del comprador NO sale de aqui
+ * -- ver parseAdjuntoTicket_, porque un mismo correo puede traer varios
+ * tickets para personas distintas (ver el ejemplo de "en grupo" en el
+ * comentario de mas abajo) y el nombre real esta en cada adjunto, no en
+ * el destinatario del correo.
  */
-function extraerDestinatario_(msg) {
+function extraerEmailDestinatario_(msg) {
   var to = (msg.getTo() || '').split(',')[0].trim();
   var match = to.match(/^(.*)<(.+)>$/);
-  if (match) {
-    var nombre = match[1].replace(/["']/g, '').trim();
-    return { nombre: nombre || 'Sin nombre', email: match[2].trim() };
-  }
-  return { nombre: 'Sin nombre', email: to };
+  return match ? match[2].trim() : to;
 }
 
 /**
- * Codigo del ticket = nombre del archivo adjunto sin extension.
- * Devuelve null si el adjunto no tiene pinta de imagen (para no colar
- * un PDF de factura o algo asi como si fuera el codigo del QR).
+ * Saca el codigo de ticket (ej. "EOS-GN-208") Y el nombre del comprador
+ * del nombre de archivo del adjunto. Los nombres de archivo reales que
+ * se estan usando (visto en el diagnostico) tienen esta forma, con
+ * variaciones:
+ *   "Valentina_Fernandez_1de1_EOS_GN_208.png"
+ *   "Juan_Manuel_Arias_Gallego_fecha2_neon_EOS-GN-161.png"
+ *   "Santiago_Zuluaga_Aguilar_EOS-GN-301.png"
+ *   "Ana_Garcia_1de2_EOS-GN-287 (1).png"   <- el "(1)" lo agrega Gmail
+ *                                             solo si dos adjuntos del
+ *                                             mismo correo se llaman
+ *                                             igual; no es parte del
+ *                                             nombre ni del codigo.
+ *
+ * O sea: "{Nombre con espacios como _}[_fechaN][_neon][_NdeM]_EOS[-_]TIPO[-_]NUMERO[.ext][ (n)]"
+ *
+ * Devuelve null si el nombre del archivo no tiene un codigo tipo
+ * "EOS-XXX-123" reconocible (asi no cuela adjuntos que no son tickets,
+ * como el icono de un correo de rebote).
  */
-function extraerTicketIdDeAdjunto_(attachment) {
-  var nombre = attachment.getName() || '';
-  if (!/\.(png|jpe?g|webp)$/i.test(nombre)) return null;
-  return nombre.replace(/\.(png|jpe?g|webp)$/i, '').trim();
+function parseAdjuntoTicket_(attachment) {
+  var nombreArchivo = attachment.getName() || '';
+  var base = nombreArchivo.replace(/\.(png|jpe?g|webp)$/i, '');
+
+  var m = base.match(/EOS[-_]([A-Za-z]{1,6})[-_](\d+)/i);
+  if (!m) return null;
+
+  var ticketId = 'EOS-' + m[1].toUpperCase() + '-' + m[2];
+
+  var partesNombre = base.substring(0, m.index).split('_').filter(function (p) { return p !== ''; });
+  // quita sufijos conocidos que no son parte del nombre (pueden venir
+  // encadenados, ej. "..._fecha2_neon_EOS...", por eso el while)
+  while (
+    partesNombre.length &&
+    /^(fecha\d+|neon|\d+de\d+)$/i.test(partesNombre[partesNombre.length - 1])
+  ) {
+    partesNombre.pop();
+  }
+
+  var nombre = partesNombre.join(' ').trim();
+  return { ticketId: ticketId, nombre: nombre || 'Sin nombre' };
 }
 
 /**
  * PASO 1 — Solo lectura. Corre esto primero y revisa el log (Ver >
  * Registros de ejecucion) antes de importar nada de verdad. Muestra,
- * por cada correo encontrado: asunto, tipo detectado, a quien se mando,
- * y el/los codigo(s) de ticket que se van a sacar de los adjuntos.
+ * por cada correo encontrado: asunto, tipo detectado, email del
+ * comprador, y el/los ticket(s) [codigo + nombre] que se van a sacar de
+ * los adjuntos.
+ *
+ * El limite de busqueda es 500 hilos -- si "Hilos encontrados" sale
+ * exactamente 500, probablemente hay mas y hay que subir el numero.
  */
 function diagnosticarImportacionManualQR() {
-  const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 50);
+  const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 500);
   Logger.log('Hilos encontrados: ' + threads.length);
 
-  let totalMensajes = 0, totalAdjuntosValidos = 0, sinAdjuntoValido = 0;
+  let totalMensajes = 0, totalTicketsValidos = 0, sinAdjuntoValido = 0;
+  const porTipo = {};
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       totalMensajes++;
       const tipo = clasificarTipoManual_(msg.getSubject());
-      const destinatario = extraerDestinatario_(msg);
-      const codigos = msg.getAttachments()
-        .map(extraerTicketIdDeAdjunto_)
-        .filter(function (c) { return c; });
+      const email = extraerEmailDestinatario_(msg);
+      const tickets = msg.getAttachments()
+        .map(parseAdjuntoTicket_)
+        .filter(function (t) { return t; });
 
-      if (codigos.length === 0) sinAdjuntoValido++;
-      totalAdjuntosValidos += codigos.length;
+      if (tickets.length === 0) { sinAdjuntoValido++; return; }
+      totalTicketsValidos += tickets.length;
+      porTipo[tipo] = (porTipo[tipo] || 0) + tickets.length;
 
-      Logger.log(
-        '[' + tipo + '] "' + msg.getSubject() + '" -> ' +
-        destinatario.nombre + ' <' + destinatario.email + '> -> ' +
-        'codigos: [' + codigos.join(', ') + ']'
-      );
+      const detalle = tickets.map(function (t) { return t.ticketId + ' (' + t.nombre + ')'; }).join(', ');
+      Logger.log('[' + tipo + '] "' + msg.getSubject() + '" -> ' + email + ' -> ' + detalle);
     });
   });
 
   Logger.log('--- RESUMEN ---');
   Logger.log('Mensajes: ' + totalMensajes);
-  Logger.log('Codigos de ticket detectados: ' + totalAdjuntosValidos);
-  Logger.log('Mensajes sin ningun adjunto valido: ' + sinAdjuntoValido);
+  Logger.log('Tickets detectados: ' + totalTicketsValidos);
+  Object.keys(porTipo).sort().forEach(function (tipo) {
+    Logger.log('  ' + tipo + ': ' + porTipo[tipo]);
+  });
+  Logger.log('Mensajes sin ningun ticket valido en sus adjuntos: ' + sinAdjuntoValido);
 }
 
 /**
  * PASO 2 — Escribe de verdad. Agrega una fila en "Repositorio QR" por
- * cada codigo de ticket nuevo (salta los que ya existan en la Sheet, asi
- * que se puede correr varias veces sin duplicar). Quedan con
+ * cada ticket nuevo (salta los que ya existan en la Sheet por Ticket ID,
+ * asi se puede correr varias veces sin duplicar). Quedan con
  * Escaneado = false, listos para validarse en la puerta con
  * escanear.html igual que los tickets vendidos por Wompi.
  */
@@ -896,34 +950,34 @@ function importarCorreosManualQR() {
     if (data[i][4]) existentes[data[i][4]] = true;
   }
 
-  const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 50);
+  const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 500);
   let nuevos = 0, duplicados = 0, sinAdjuntoValido = 0;
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       const tipo = clasificarTipoManual_(msg.getSubject());
-      const destinatario = extraerDestinatario_(msg);
-      const codigos = msg.getAttachments()
-        .map(extraerTicketIdDeAdjunto_)
-        .filter(function (c) { return c; });
+      const email = extraerEmailDestinatario_(msg);
+      const tickets = msg.getAttachments()
+        .map(parseAdjuntoTicket_)
+        .filter(function (t) { return t; });
 
-      if (codigos.length === 0) { sinAdjuntoValido++; return; }
+      if (tickets.length === 0) { sinAdjuntoValido++; return; }
 
-      codigos.forEach(function (ticketId) {
-        if (existentes[ticketId]) { duplicados++; return; }
+      tickets.forEach(function (t) {
+        if (existentes[t.ticketId]) { duplicados++; return; }
 
         sheet.appendRow([
-          msg.getDate(), 'End of Summer', tipo, '', ticketId,
-          'MANUAL', msg.getSubject(), destinatario.nombre, destinatario.email, '',
+          msg.getDate(), 'End of Summer', tipo, '', t.ticketId,
+          'MANUAL', msg.getSubject(), t.nombre, email, '',
           '', 'pagado', true, false, ''
         ]);
-        existentes[ticketId] = true;
+        existentes[t.ticketId] = true;
         nuevos++;
       });
     });
   });
 
-  Logger.log('Importados: ' + nuevos + ' | Duplicados (ya existian): ' + duplicados + ' | Correos sin adjunto valido: ' + sinAdjuntoValido);
+  Logger.log('Importados: ' + nuevos + ' | Duplicados (ya existian): ' + duplicados + ' | Correos sin ningun ticket valido: ' + sinAdjuntoValido);
 }
 
 /**
