@@ -780,7 +780,7 @@ function escapeHtml_(s) {
  * usa appendRow_(). Una vez ahi, escanear.html los reconoce sin tocar nada
  * mas.
  *
- * SUPUESTOS (verificalos con diagnosticarImportacionManualQR_ primero):
+ * SUPUESTOS (verificalos con diagnosticarImportacionManualQR primero):
  *   1. Este script corre en la cuenta de Gmail que MANDO esos correos
  *      (fantributeco@gmail.com). GmailApp solo puede leer/buscar en la
  *      cuenta due単a del proyecto de Apps Script — si el que mando los
@@ -849,7 +849,7 @@ function extraerTicketIdDeAdjunto_(attachment) {
  * por cada correo encontrado: asunto, tipo detectado, a quien se mando,
  * y el/los codigo(s) de ticket que se van a sacar de los adjuntos.
  */
-function diagnosticarImportacionManualQR_() {
+function diagnosticarImportacionManualQR() {
   const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 50);
   Logger.log('Hilos encontrados: ' + threads.length);
 
@@ -933,7 +933,7 @@ function importarCorreosManualQR() {
  * puedes ver de una si "Summer 2016" (primera fecha) esta completo o si
  * falta cargar algo, sin tener que contar filas a mano en el Sheet.
  */
-function resumenTicketsPorEvento_() {
+function resumenTicketsPorEvento() {
   const sheet = getSheet_();
   const data = sheet.getDataRange().getValues();
   const resumen = {};
