@@ -839,7 +839,8 @@ var TIPO_POR_PREFIJO_ = {
   GN: 'General', GEN: 'General',
   VIP: 'VIP',
   BKS: 'Backstage', BACKSTAGE: 'Backstage',
-  PV: 'Preventa', PV1: 'Preventa 1', PV2: 'Preventa 2', PRE: 'Preventa'
+  PV: 'Preventa', PV1: 'Preventa 1', PV2: 'Preventa 2', PRE: 'Preventa',
+  ESP: 'Preventa Especial' // EOS2-ESP-### -- boletas con regalo para casos puntuales (confirmar significado exacto si hace falta)
 };
 
 function tipoPorPrefijo_(prefijo) {
@@ -884,16 +885,22 @@ function extraerEmailDestinatario_(msg) {
  * Devuelve null si el nombre del archivo no tiene un codigo tipo
  * "EOS-XXX-123" reconocible (asi no cuela adjuntos que no son tickets,
  * como el icono de un correo de rebote).
+ *
+ * OJO: los de Preventa usan "EOS2-PV-###" (con un "2" pegado a EOS antes
+ * del guion), no "EOS-PV-###" -- por eso el regex acepta un numero
+ * opcional ahi (\d*) y lo conserva en el ticketId final, para no
+ * mezclar "EOS-PV-1" con "EOS2-PV-1" como si fueran el mismo codigo.
  */
 function parseAdjuntoTicket_(attachment) {
   var nombreArchivo = attachment.getName() || '';
   var base = nombreArchivo.replace(/\.(png|jpe?g|webp)$/i, '');
 
-  var m = base.match(/EOS[-_]([A-Za-z]{1,6})[-_](\d+)/i);
+  var m = base.match(/EOS(\d*)[-_]([A-Za-z]{1,6})[-_](\d+)/i);
   if (!m) return null;
 
-  var prefijo = m[1].toUpperCase();
-  var ticketId = 'EOS-' + prefijo + '-' + m[2];
+  var familia = m[1] || ''; // '' o '2'
+  var prefijo = m[2].toUpperCase();
+  var ticketId = 'EOS' + familia + '-' + prefijo + '-' + m[3];
   var tipo = tipoPorPrefijo_(prefijo);
 
   var partesNombre = base.substring(0, m.index).split('_').filter(function (p) { return p !== ''; });
