@@ -1031,6 +1031,7 @@ function diagnosticarImportacionManualQR() {
   });
   Logger.log('Hilos encontrados: ' + r.hilos);
 
+  asignarNumerosDeOrden_(r.porId);
   const porTipo = {};
   Object.keys(r.porId).forEach(function (id) { porTipo[r.porId[id].tipo] = (porTipo[r.porId[id].tipo] || 0) + 1; });
 
@@ -1050,15 +1051,54 @@ function diagnosticarImportacionManualQR() {
   } else {
     Logger.log('Sin reventas detectadas (ningun Ticket ID con mas de un nombre).');
   }
+
+  Logger.log('--- NUMERO DE ORDEN DE COMPRA (columna "Numero", por tipo, no toca el Ticket ID) ---');
+  Object.keys(porTipo).sort().forEach(function (tipo) {
+    const deEseTipo = Object.keys(r.porId)
+      .map(function (id) { return r.porId[id]; })
+      .filter(function (t) { return t.tipo === tipo; })
+      .sort(function (a, b) { return a.numeroOrden - b.numeroOrden; });
+    Logger.log('  ' + tipo + ':');
+    deEseTipo.forEach(function (t) {
+      Logger.log('    #' + t.numeroOrden + ' -> ' + t.ticketId + ' (' + t.nombre + ')');
+    });
+  });
+}
+
+/**
+ * Asigna un numero de orden de compra (1, 2, 3...) a cada ticket de
+ * porId, POR TIPO, segun la fecha real del correo (el mas viejo es el
+ * 1). Esto llena la columna "Numero" -- que es independiente del
+ * "Ticket ID" real (ese nunca se toca, porque tiene que seguir
+ * coincidiendo con el codigo que ya trae el QR que cada persona tiene).
+ *
+ * Ojo: esto solo numera el lote de tickets manuales que se esta
+ * importando (los de esta busqueda de Gmail) -- NO incluye los ~174
+ * tickets que ya estaban en la Sheet por el sistema automatico de
+ * Wompi, esos tienen su propia numeracion y renumerarlos junto con
+ * estos seria un cambio mucho mas grande que no se ha pedido.
+ */
+function asignarNumerosDeOrden_(porId) {
+  const porTipo = {};
+  Object.keys(porId).forEach(function (id) {
+    const t = porId[id];
+    if (!porTipo[t.tipo]) porTipo[t.tipo] = [];
+    porTipo[t.tipo].push(t);
+  });
+  Object.keys(porTipo).forEach(function (tipo) {
+    porTipo[tipo].sort(function (a, b) { return a.fecha - b.fecha; });
+    porTipo[tipo].forEach(function (t, i) { t.numeroOrden = i + 1; });
+  });
 }
 
 /**
  * PASO 2 — Escribe de verdad en "Repositorio QR". Por cada ticket:
- *   - Si el codigo NO esta en la Sheet, agrega una fila nueva.
- *   - Si YA esta pero con un nombre/email distinto (reventa que se
- *     proceso en una corrida anterior con la logica vieja, o una
- *     reventa nueva), ACTUALIZA esa fila con el nombre/email actual en
- *     vez de dejarla como estaba. No duplica filas.
+ *   - Si el codigo NO esta en la Sheet, agrega una fila nueva (con su
+ *     numero de orden de compra en la columna "Numero").
+ *   - Si YA esta pero con un tipo/nombre/email/numero distinto
+ *     (reventa procesada con la logica vieja, o esta es la primera vez
+ *     que se le asigna numero de orden), ACTUALIZA esa fila en vez de
+ *     dejarla como estaba. No duplica filas.
  * Se puede correr las veces que haga falta -- cada vez deja la Sheet al
  * dia con el ultimo reenvio visto en Gmail.
  */
@@ -1071,6 +1111,7 @@ function importarCorreosManualQR() {
   }
 
   const r = recolectarTicketsManuales_();
+  asignarNumerosDeOrden_(r.porId);
   let nuevos = 0, actualizados = 0, sinCambios = 0;
 
   Object.keys(r.porId).forEach(function (ticketId) {
@@ -1079,7 +1120,7 @@ function importarCorreosManualQR() {
 
     if (!fila) {
       sheet.appendRow([
-        t.fecha, 'End of Summer', t.tipo, '', t.ticketId,
+        t.fecha, 'End of Summer', t.tipo, t.numeroOrden, t.ticketId,
         'MANUAL', t.asunto, t.nombre, t.email, '',
         '', 'pagado', true, false, ''
       ]);
@@ -1088,12 +1129,17 @@ function importarCorreosManualQR() {
     }
 
     const tipoActual = sheet.getRange(fila, 3).getValue();
+    const numeroActual = sheet.getRange(fila, 4).getValue();
     const nombreActual = sheet.getRange(fila, 8).getValue();
     const cambios = [];
 
     if (tipoActual !== t.tipo) {
       sheet.getRange(fila, 3).setValue(t.tipo); // columna C = Tipo de entrada
       cambios.push('tipo "' + tipoActual + '" -> "' + t.tipo + '"');
+    }
+    if (numeroActual !== t.numeroOrden) {
+      sheet.getRange(fila, 4).setValue(t.numeroOrden); // columna D = Numero (orden de compra)
+      cambios.push('numero ' + (numeroActual || '(vacio)') + ' -> ' + t.numeroOrden);
     }
     if (nombreActual !== t.nombre) {
       sheet.getRange(fila, 8).setValue(t.nombre); // columna H = Nombre
