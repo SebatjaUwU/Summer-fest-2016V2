@@ -938,12 +938,15 @@ function recolectarTicketsManuales_(onMensaje) {
       totalMensajes++;
       const email = extraerEmailDestinatario_(msg);
       const fecha = msg.getDate();
-      const tickets = msg.getAttachments()
-        .map(parseAdjuntoTicket_)
-        .filter(function (t) { return t; });
+      const attachments = msg.getAttachments();
+      const tickets = attachments.map(parseAdjuntoTicket_).filter(function (t) { return t; });
 
-      if (tickets.length === 0) { sinAdjuntoValido++; return; }
-      if (onMensaje) onMensaje(msg, email, tickets);
+      if (tickets.length === 0) { sinAdjuntoValido++; }
+      if (onMensaje) {
+        const nombresAdjuntos = attachments.map(function (a) { return a.getName(); });
+        onMensaje(msg, email, tickets, nombresAdjuntos);
+      }
+      if (tickets.length === 0) return;
 
       tickets.forEach(function (t) {
         if (!historial[t.ticketId]) historial[t.ticketId] = [];
@@ -977,9 +980,18 @@ function recolectarTicketsManuales_(onMensaje) {
  * vieron con mas de un nombre (reventas) y con cual se va a quedar.
  */
 function diagnosticarImportacionManualQR() {
-  const r = recolectarTicketsManuales_(function (msg, email, tickets) {
-    const detalle = tickets.map(function (t) { return t.ticketId + ' [' + t.tipo + '] (' + t.nombre + ')'; }).join(', ');
-    Logger.log(Utilities.formatDate(msg.getDate(), Session.getScriptTimeZone(), 'yyyy-MM-dd') + ' "' + msg.getSubject() + '" -> ' + email + ' -> ' + detalle);
+  const r = recolectarTicketsManuales_(function (msg, email, tickets, nombresAdjuntos) {
+    const fecha = Utilities.formatDate(msg.getDate(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    if (tickets.length > 0) {
+      const detalle = tickets.map(function (t) { return t.ticketId + ' [' + t.tipo + '] (' + t.nombre + ')'; }).join(', ');
+      Logger.log(fecha + ' "' + msg.getSubject() + '" -> ' + email + ' -> ' + detalle);
+    } else {
+      // No se pudo sacar ningun ticket de los adjuntos -- se loguean los
+      // nombres de archivo TAL CUAL vienen, para poder ver por que no
+      // matchean el patron "EOS-XX-###".
+      const adjuntos = nombresAdjuntos.length ? nombresAdjuntos.join(' | ') : '(sin adjuntos)';
+      Logger.log(fecha + ' "' + msg.getSubject() + '" -> ' + email + ' -> ⚠ SIN TICKET, adjuntos: ' + adjuntos);
+    }
   });
   Logger.log('Hilos encontrados: ' + r.hilos);
 
