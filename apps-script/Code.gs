@@ -816,7 +816,7 @@ function escapeHtml_(s) {
  */
 
 var IMPORT_MANUAL_SEARCH_ =
-  'in:sent (' +
+  'in:sent after:2026/08/10 (' + // solo correos de segunda fecha enviados despues del 10 de agosto
   'subject:"END OF SUMMER: QR GENERAL" OR ' +
   'subject:"VIP EN OF SUMMER" OR ' +
   'subject:"QRs de PREVENTA END OF SUMMER" OR ' +
