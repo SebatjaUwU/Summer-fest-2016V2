@@ -951,19 +951,29 @@ function parseAdjuntoTicket_(attachment) {
 // una respuesta posterior.
 var IMPORT_MANUAL_DESPUES_DE_ = new Date('2026-08-10T00:00:00');
 
+// Correos propios/de prueba que NO son compradores reales -- se
+// excluyen del import aunque su correo traiga adjuntos con codigo
+// valido (ej. envios de prueba del propio organizador).
+var IMPORT_MANUAL_EMAILS_EXCLUIDOS_ = ['everchidory@gmail.com'];
+
 function recolectarTicketsManuales_(onMensaje) {
   const threads = GmailApp.search(IMPORT_MANUAL_SEARCH_, 0, 500);
   const porId = {};
   const historial = {}; // ticketId -> [nombres vistos en orden] (solo para loguear reventas)
-  let totalMensajes = 0, sinAdjuntoValido = 0, fueraDeFecha = 0;
+  let totalMensajes = 0, sinAdjuntoValido = 0, fueraDeFecha = 0, excluidos = 0;
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       const fecha = msg.getDate();
       if (fecha < IMPORT_MANUAL_DESPUES_DE_) { fueraDeFecha++; return; }
 
-      totalMensajes++;
       const email = extraerEmailDestinatario_(msg);
+      if (IMPORT_MANUAL_EMAILS_EXCLUIDOS_.indexOf((email || '').toLowerCase()) !== -1) {
+        excluidos++;
+        return;
+      }
+
+      totalMensajes++;
       const attachments = msg.getAttachments();
       const tickets = attachments.map(parseAdjuntoTicket_).filter(function (t) { return t; });
 
@@ -994,7 +1004,7 @@ function recolectarTicketsManuales_(onMensaje) {
   return {
     porId: porId, historial: historial, revendidos: revendidos,
     totalMensajes: totalMensajes, sinAdjuntoValido: sinAdjuntoValido,
-    fueraDeFecha: fueraDeFecha, hilos: threads.length
+    fueraDeFecha: fueraDeFecha, excluidos: excluidos, hilos: threads.length
   };
 }
 
@@ -1030,6 +1040,7 @@ function diagnosticarImportacionManualQR() {
   Object.keys(porTipo).sort().forEach(function (tipo) { Logger.log('  ' + tipo + ': ' + porTipo[tipo]); });
   Logger.log('Mensajes sin ningun ticket valido en sus adjuntos: ' + r.sinAdjuntoValido);
   Logger.log('Mensajes descartados por venir antes del corte (' + Utilities.formatDate(IMPORT_MANUAL_DESPUES_DE_, Session.getScriptTimeZone(), 'yyyy-MM-dd') + '), colados por un hilo con respuesta mas nueva: ' + r.fueraDeFecha);
+  Logger.log('Mensajes excluidos por correo propio/de prueba (' + IMPORT_MANUAL_EMAILS_EXCLUIDOS_.join(', ') + '): ' + r.excluidos);
 
   if (r.revendidos.length) {
     Logger.log('--- 🔁 REVENDIDOS: mismo Ticket ID visto con mas de un nombre (se queda con el mas reciente) ---');
@@ -1098,7 +1109,7 @@ function importarCorreosManualQR() {
     }
   });
 
-  Logger.log('Nuevos: ' + nuevos + ' | Actualizados por reventa/reenvio: ' + actualizados + ' | Sin cambios: ' + sinCambios + ' | Mensajes: ' + r.totalMensajes + ' | Sin ticket valido: ' + r.sinAdjuntoValido + ' | Descartados antes del corte: ' + r.fueraDeFecha);
+  Logger.log('Nuevos: ' + nuevos + ' | Actualizados por reventa/reenvio: ' + actualizados + ' | Sin cambios: ' + sinCambios + ' | Mensajes: ' + r.totalMensajes + ' | Sin ticket valido: ' + r.sinAdjuntoValido + ' | Descartados antes del corte: ' + r.fueraDeFecha + ' | Excluidos (correo propio): ' + r.excluidos);
 }
 
 /**
