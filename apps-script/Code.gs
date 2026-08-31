@@ -1036,11 +1036,22 @@ function importarCorreosManualQR() {
       return;
     }
 
+    const tipoActual = sheet.getRange(fila, 3).getValue();
     const nombreActual = sheet.getRange(fila, 8).getValue();
+    const cambios = [];
+
+    if (tipoActual !== t.tipo) {
+      sheet.getRange(fila, 3).setValue(t.tipo); // columna C = Tipo de entrada
+      cambios.push('tipo "' + tipoActual + '" -> "' + t.tipo + '"');
+    }
     if (nombreActual !== t.nombre) {
       sheet.getRange(fila, 8).setValue(t.nombre); // columna H = Nombre
       sheet.getRange(fila, 9).setValue(t.email);  // columna I = Email
-      Logger.log('Actualizado ' + ticketId + ' (reventa/reenvio): "' + nombreActual + '" -> "' + t.nombre + '"');
+      cambios.push('nombre "' + nombreActual + '" -> "' + t.nombre + '"');
+    }
+
+    if (cambios.length) {
+      Logger.log('Actualizado ' + ticketId + ': ' + cambios.join(', '));
       actualizados++;
     } else {
       sinCambios++;
