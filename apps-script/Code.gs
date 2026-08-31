@@ -815,13 +815,13 @@ function escapeHtml_(s) {
  *      trayendo y toca subir el numero en las dos funciones de abajo.
  */
 
+// Reducido a SOLO Preventa (EOS2-PV-/EOS2-ESP-) por pedido explicito --
+// General/VIP (EOS-GN-/EOS-VIP-, asuntos "END OF SUMMER: QR GENERAL" /
+// "VIP EN OF SUMMER") quedan fuera de este import por ahora. Si algun
+// dia se quiere volver a incluirlos, agregar de nuevo esas clausulas
+// "subject:" con OR, como estaba antes.
 var IMPORT_MANUAL_SEARCH_ =
-  'in:sent after:2026/08/10 (' + // solo correos de segunda fecha enviados despues del 10 de agosto
-  'subject:"END OF SUMMER: QR GENERAL" OR ' +
-  'subject:"VIP EN OF SUMMER" OR ' +
-  'subject:"QRs de PREVENTA END OF SUMMER" OR ' +
-  'subject:"QR PREVENTA SEGUNDA FECHA"' + // confirmado real (27-ago) — el anterior nunca hizo match
-  ')';
+  'in:sent after:2026/08/10 subject:"QR PREVENTA SEGUNDA FECHA"'; // confirmado real (27-ago)
 
 /**
  * Traduce el prefijo de tipo dentro del codigo (la parte entre "EOS-" y
