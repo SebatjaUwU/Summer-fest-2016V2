@@ -903,13 +903,22 @@ function parseAdjuntoTicket_(attachment) {
   var ticketId = 'EOS' + familia + '-' + prefijo + '-' + m[3];
   var tipo = tipoPorPrefijo_(prefijo);
 
-  var partesNombre = base.substring(0, m.index).split('_').filter(function (p) { return p !== ''; });
+  var nombreCrudo = base.substring(0, m.index);
+  // Preventa (PV) trae o no trae regalo segun el nombre del archivo
+  // ("_regalo_" vs "_normal_" sin mas) -- eso es justo lo que distingue
+  // Preventa 1 (con regalo) de Preventa 2 (sin regalo) en la promo real,
+  // asi que se separa por eso en vez de dejarlas todas como "Preventa".
+  if (prefijo === 'PV') {
+    tipo = /regalo/i.test(nombreCrudo) ? 'Preventa 1' : 'Preventa 2';
+  }
+
+  var partesNombre = nombreCrudo.split('_').filter(function (p) { return p !== ''; });
   // quita sufijos conocidos que no son parte del nombre (pueden venir
   // encadenados, ej. "..._fecha2_neon_EOS..." o "..._vip_EOS...", por
   // eso el while)
   while (
     partesNombre.length &&
-    /^(fecha\d+|neon|\d+de\d+|general|vip|backstage|preventa\d*|pv\d*)$/i.test(partesNombre[partesNombre.length - 1])
+    /^(fecha\d+|neon|\d+de\d+|general|vip|backstage|preventa\d*|pv\d*|normal|regalo|special|especial)$/i.test(partesNombre[partesNombre.length - 1])
   ) {
     partesNombre.pop();
   }
