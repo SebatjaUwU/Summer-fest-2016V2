@@ -819,7 +819,8 @@ var IMPORT_MANUAL_SEARCH_ =
   'in:sent (' +
   'subject:"END OF SUMMER: QR GENERAL" OR ' +
   'subject:"VIP EN OF SUMMER" OR ' +
-  'subject:"QRs de PREVENTA END OF SUMMER"' +
+  'subject:"QRs de PREVENTA END OF SUMMER" OR ' +
+  'subject:"QR PREVENTA SEGUNDA FECHA"' + // confirmado real (27-ago) — el anterior nunca hizo match
   ')';
 
 /**
