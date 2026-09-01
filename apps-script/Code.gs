@@ -1,24 +1,35 @@
 /**
- * Repositorio de QR — revisa periódicamente la bandeja de Gmail buscando
- * los correos "Transacción APROBADA" que Wompi manda automáticamente
- * (directos o reenviados a mano desde otra cuenta, ej.
- * sebatja1234@gmail.com), genera un ticket numerado por tipo, lo guarda
- * en esta Sheet y envía el QR por Gmail al comprador.
+ * Repositorio de QR — genera un ticket numerado por tipo, lo guarda en
+ * esta Sheet y envía el QR por Gmail al comprador, cada vez que se
+ * detecta una venta aprobada por Wompi. Hay DOS caminos para detectar
+ * esa venta, corriendo en paralelo:
  *
- * No usa webhook de Wompi (no hace falta configurar nada en el dashboard
- * de Wompi ni guardar WOMPI_EVENTS_SECRET). Todo se dispara desde un
- * trigger de tiempo que corre esta función:
+ *   1. checkWompiSales (trigger de tiempo) — revisa periódicamente la
+ *      bandeja de Gmail buscando los correos "Transacción APROBADA"
+ *      que Wompi manda (directos o reenviados a mano desde otra cuenta,
+ *      ej. sebatja1234@gmail.com). No necesita nada configurado en el
+ *      dashboard de Wompi.
+ *   2. manejarWebhookWompi_ (dentro de doPost) — Wompi le pega
+ *      directo a este Web App cuando la transacción cambia de estado.
+ *      Mucho más rápido que esperar el correo, pero SÍ requiere
+ *      configurar el webhook en Wompi y guardar WOMPI_EVENTS_SECRET
+ *      (ver el comentario completo justo encima de
+ *      manejarWebhookWompi_, más abajo en este archivo).
  *
- *   checkWompiSales
+ * Los dos caminos comparten LINK_MAP/AUTO_LINK_IDS y usan
+ * findRowByTransactionId_() antes de escribir, así que no se duplican
+ * tickets aunque ambos lleguen a procesar la misma venta.
  *
- * Configuración requerida (una sola vez):
+ * Configuración mínima requerida (checkWompiSales, una sola vez):
  *   1. Extensiones > Apps Script > icono de reloj "Activadores" (Triggers)
  *      > Añadir activador:
  *        - Función a ejecutar: checkWompiSales
  *        - Origen del evento: Basado en tiempo
  *        - Tipo de activador: Temporizador por minutos
  *        - Cada 5 minutos (o el intervalo que prefieras)
- *   2. Nada más — no se necesitan Propiedades de secuencia de comandos.
+ *   2. Nada más para este camino — no se necesitan Propiedades de
+ *      secuencia de comandos. El webhook (opcional) tiene su propia
+ *      configuración, explicada donde está su código.
  */
 
 // payment_link_id (Wompi) -> { evento, tipo, prefijo, cantidad }
@@ -115,9 +126,12 @@ function doGet(e) {
 }
 
 /**
- * Usado por eventos/escanear.html (el escaner de la entrada). Recibe
- * { action: 'scan', ticketId, pin } por POST y marca el ticket como
- * escaneado en la Sheet.
+ * Dos clientes distintos le pegan a este mismo doPost:
+ *   1. eventos/escanear.html (el escaner de la entrada) manda
+ *      { action: 'scan', ticketId, pin } — logica sin cambios, mas abajo.
+ *   2. Wompi (webhook real de eventos), manda su propio formato con
+ *      "event"/"signature"/"data" — se detecta y se enruta a
+ *      manejarWebhookWompi_() antes de llegar a la logica del escaner.
  *
  * Si STAFF_PIN esta configurado en Propiedades de secuencia de comandos,
  * hay que mandarlo igual — asi nadie que solo vea el codigo QR (ej. en
@@ -130,6 +144,10 @@ function doPost(e) {
     body = JSON.parse(e.postData.contents);
   } catch (err) {
     return jsonResponse_({ ok: false, status: 'peticion_invalida' });
+  }
+
+  if (body.event && body.signature && body.data) {
+    return manejarWebhookWompi_(body);
   }
 
   if (body.action !== 'scan') {
@@ -205,6 +223,169 @@ function resendMissingVipBackstage() {
       }
     }
   }
+}
+
+/* =========================================================================
+ * WEBHOOK REAL DE WOMPI (eventos) — alternativa a leer correos
+ * =========================================================================
+ * Wompi manda un POST directo a este mismo Web App cada vez que una
+ * transaccion cambia de estado, con este formato (resumido):
+ *   {
+ *     "event": "transaction.updated",
+ *     "data": { "transaction": { "id", "reference", "status",
+ *                                 "amount_in_cents", "customer_email",
+ *                                 "customer_data": { "full_name",
+ *                                                     "phone_number" } } },
+ *     "timestamp": 1690000000,
+ *     "signature": { "properties": ["transaction.id", "transaction.status",
+ *                                    "transaction.amount_in_cents"],
+ *                     "checksum": "..." }
+ *   }
+ *
+ * Configuracion necesaria en Wompi (una sola vez), dashboard >
+ * Desarrolladores > Eventos:
+ *   1. URL del webhook = la URL del Web App desplegado (la misma que usa
+ *      escanear.html), termina en "/exec".
+ *   2. Copiar el "Secreto de eventos" que te muestra Wompi ahi mismo.
+ *   3. En este proyecto de Apps Script: Configuracion del proyecto (⚙️) >
+ *      Propiedades de secuencia de comandos > agregar
+ *      WOMPI_EVENTS_SECRET = ese secreto.
+ *
+ * IMPORTANTE: esto corre EN PARALELO al sistema de correos
+ * (checkWompiSales), no lo reemplaza todavia. Como ambos usan
+ * findRowByTransactionId_() antes de escribir, si por algun motivo los
+ * dos llegan a procesar la misma transaccion no se duplica el ticket —
+ * asi que es seguro dejarlos corriendo juntos mientras se confirma que
+ * el webhook funciona bien, antes de eventualmente apagar el trigger de
+ * checkWompiSales.
+ *
+ * "reference" es el mismo string que ya se usa en el asunto de los
+ * correos ("ref. <link_id>_<timestamp>_<random>"), asi que se reutiliza
+ * la misma logica de LINK_MAP/AUTO_LINK_IDS sin cambios.
+ */
+function manejarWebhookWompi_(body) {
+  try {
+    if (!verificarFirmaWompi_(body)) {
+      Logger.log('Webhook Wompi: firma invalida — se ignora. reference=' + (body.data && body.data.transaction && body.data.transaction.reference));
+      return jsonResponse_({ ok: false, status: 'firma_invalida' });
+    }
+
+    const tx = body.data && body.data.transaction;
+    if (!tx) return jsonResponse_({ ok: true, status: 'sin_transaccion' });
+
+    if (tx.status !== 'APPROVED') {
+      return jsonResponse_({ ok: true, status: 'no_aprobada' });
+    }
+
+    const referencia = tx.reference || '';
+    const linkId = referencia.split('_')[0];
+    const linkInfo = LINK_MAP[linkId];
+
+    if (!linkInfo) {
+      Logger.log('Webhook Wompi: link_id "' + linkId + '" no esta en LINK_MAP (referencia ' + referencia + ').');
+      return jsonResponse_({ ok: true, status: 'link_desconocido' });
+    }
+    if (AUTO_LINK_IDS.indexOf(linkId) === -1) {
+      return jsonResponse_({ ok: true, status: 'fuera_de_flujo_automatico' });
+    }
+
+    const sheet = getSheet_();
+    const txKey = tx.id || referencia;
+    if (findRowByTransactionId_(sheet, txKey)) {
+      return jsonResponse_({ ok: true, status: 'ya_procesada' });
+    }
+
+    const customerData = tx.customer_data || {};
+    const nombre = customerData.full_name || 'Sin nombre';
+    const email = tx.customer_email || '';
+    const telefono = customerData.phone_number || '';
+
+    if (!email) {
+      Logger.log('Webhook Wompi: transaccion ' + txKey + ' sin customer_email.');
+      return jsonResponse_({ ok: true, status: 'sin_email' });
+    }
+
+    const cantidad = linkInfo.cantidad || 1;
+    // amount_in_cents viene en centavos de COP -- se divide por 100 para
+    // llegar a pesos, y entre "cantidad" para repartirlo entre los
+    // tickets del combo (igual que en processWompiMessage_).
+    const montoPorTicket = Math.round((tx.amount_in_cents || 0) / 100 / cantidad);
+
+    const tickets = [];
+    for (let i = 0; i < cantidad; i++) {
+      const numero = getNextTicketNumber_(sheet, linkInfo.prefijo);
+      const ticketId = linkInfo.prefijo + '-' + String(numero).padStart(3, '0');
+
+      appendRow_(sheet, {
+        evento: linkInfo.evento, tipo: linkInfo.tipo, numero: numero, ticketId: ticketId,
+        txId: txKey, referencia: referencia, nombre: nombre, email: email, telefono: telefono,
+        montoCOP: montoPorTicket, estado: 'APPROVED'
+      });
+      tickets.push({ numero: numero, ticketId: ticketId });
+    }
+
+    let enviado = false;
+    try {
+      sendTicketEmail_({ email: email, nombre: nombre, evento: linkInfo.evento, tipo: linkInfo.tipo, tickets: tickets });
+      enviado = true;
+    } catch (mailErr) {
+      Logger.log('Webhook Wompi: error enviando correo (' + txKey + '): ' + mailErr);
+    }
+    setEmailSentFlag_(sheet, txKey, enviado);
+
+    return jsonResponse_({
+      ok: true, status: 'procesada',
+      tickets: tickets.map(function (t) { return t.ticketId; })
+    });
+  } catch (err) {
+    Logger.log('Webhook Wompi: error inesperado: ' + err);
+    return jsonResponse_({ ok: false, status: 'error_interno' });
+  }
+}
+
+/**
+ * Verifica el checksum SHA-256 que manda Wompi para confirmar que el
+ * webhook de verdad viene de ellos (y no de cualquiera que le pegue a
+ * la URL). Formula: SHA256( valores de signature.properties en orden +
+ * timestamp + WOMPI_EVENTS_SECRET ), en hexadecimal mayusculas.
+ */
+function verificarFirmaWompi_(body) {
+  const secret = PropertiesService.getScriptProperties().getProperty('WOMPI_EVENTS_SECRET');
+  if (!secret) {
+    Logger.log('WOMPI_EVENTS_SECRET no configurado en Propiedades de secuencia de comandos — no se puede verificar el webhook.');
+    return false;
+  }
+
+  const props = (body.signature && body.signature.properties) || [];
+  const checksumRecibido = ((body.signature && body.signature.checksum) || '').toUpperCase();
+  if (!checksumRecibido || props.length === 0) return false;
+
+  let cadena = '';
+  props.forEach(function (ruta) { cadena += obtenerValorPorRuta_(body.data, ruta); });
+  cadena += body.timestamp;
+  cadena += secret;
+
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, cadena, Utilities.Charset.UTF_8);
+  const checksumCalculado = bytes.map(function (b) {
+    const hex = (b < 0 ? b + 256 : b).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  }).join('').toUpperCase();
+
+  return checksumCalculado === checksumRecibido;
+}
+
+/**
+ * Navega un objeto por una ruta tipo "transaction.id" (tal como vienen
+ * en signature.properties) y devuelve el valor como string.
+ */
+function obtenerValorPorRuta_(obj, ruta) {
+  const partes = ruta.split('.');
+  let actual = obj;
+  for (let i = 0; i < partes.length; i++) {
+    if (actual == null) return '';
+    actual = actual[partes[i]];
+  }
+  return actual == null ? '' : String(actual);
 }
 
 /**
