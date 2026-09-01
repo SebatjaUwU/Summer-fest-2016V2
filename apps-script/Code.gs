@@ -1021,7 +1021,8 @@ var TIPO_POR_PREFIJO_ = {
   VIP: 'VIP',
   BKS: 'Backstage', BACKSTAGE: 'Backstage',
   PV: 'Preventa', PV1: 'Preventa 1', PV2: 'Preventa 2', PRE: 'Preventa',
-  ESP: 'Preventa Especial' // EOS2-ESP-### -- boletas con regalo para casos puntuales (confirmar significado exacto si hace falta)
+  ESP: 'Preventa Especial', // EOS2-ESP-### -- boletas con regalo para casos puntuales (confirmar significado exacto si hace falta)
+  CORT: 'Cortesía Especial' // EOS2-CORT-### -- generador herramientas-qr/cortesia-especial.html, entrada General sin costo
 };
 
 function tipoPorPrefijo_(prefijo) {
