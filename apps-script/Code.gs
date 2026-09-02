@@ -225,6 +225,75 @@ function resendMissingVipBackstage() {
   }
 }
 
+/**
+ * Solo lectura. Corre esto despues de haber cancelado una ejecucion a
+ * medias (ej. le diste a "Depurar" y luego "Detener") para ver si algo
+ * quedo a medio procesar: filas que ya tienen fila en la Sheet (o sea
+ * el ticket "existe") pero "Email enviado" sigue en FALSE. Esas son
+ * peligrosas porque el sistema automatico NO las va a reintentar solo
+ * — al encontrar la fila ya existente, la da por hecha y no vuelve a
+ * mandar el correo.
+ */
+function revisarEmailsPendientes() {
+  const sheet = getSheet_();
+  const data = sheet.getDataRange().getValues();
+  let pendientes = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const enviado = data[i][12];
+    const ticketId = data[i][4];
+    if (ticketId && !enviado) {
+      pendientes++;
+      Logger.log(
+        'PENDIENTE fila ' + (i + 1) + ': ' + ticketId + ' [' + data[i][2] + '] ' +
+        data[i][7] + ' <' + data[i][8] + '> — Transaccion: ' + data[i][5]
+      );
+    }
+  }
+
+  Logger.log('--- Total pendientes de correo: ' + pendientes + ' ---');
+  if (pendientes === 0) Logger.log('Nada pendiente — no parece que se haya quedado a medias.');
+}
+
+/**
+ * Escribe de verdad: reenvia el correo con el QR para CUALQUIER fila
+ * con "Email enviado" = FALSE (no solo VIP/Backstage como
+ * resendMissingVipBackstage). No genera tickets nuevos ni duplica
+ * filas, solo re-manda el correo y marca la columna como enviado.
+ * Corre revisarEmailsPendientes primero para ver la lista antes de
+ * mandar nada.
+ */
+function reenviarEmailsPendientes() {
+  const sheet = getSheet_();
+  const data = sheet.getDataRange().getValues();
+  let reenviados = 0, fallidos = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const enviado = data[i][12];
+    const ticketId = data[i][4];
+    if (!ticketId || enviado) continue;
+
+    const row = i + 1;
+    try {
+      sendTicketEmail_({
+        email: data[i][8],
+        nombre: data[i][7],
+        evento: data[i][1],
+        tipo: data[i][2],
+        tickets: [{ numero: data[i][3], ticketId: ticketId }]
+      });
+      sheet.getRange(row, 13).setValue(true);
+      Logger.log('Reenviado: ' + ticketId + ' a ' + data[i][8]);
+      reenviados++;
+    } catch (err) {
+      Logger.log('Fallo al reenviar ' + ticketId + ': ' + err);
+      fallidos++;
+    }
+  }
+
+  Logger.log('Reenviados: ' + reenviados + ' | Fallidos: ' + fallidos);
+}
+
 /* =========================================================================
  * WEBHOOK REAL DE WOMPI (eventos) — alternativa a leer correos
  * =========================================================================
