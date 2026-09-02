@@ -983,7 +983,6 @@
     const card = document.getElementById(cardId);
     if(!cfg || !el || !btn || !card) return;
     const remaining = cfg.remaining;
-    const plural = remaining === 1 ? cfg.unit : cfg.unit + 's';
     const label = unavailableLabel || 'Agotado';
     if(remaining <= 0){
       el.classList.add('is-soldout');
@@ -998,7 +997,7 @@
       });
     } else if(remaining <= cfg.lowThreshold){
       el.classList.add('is-low');
-      el.innerHTML = '<span class="stock-dot"></span> ¡Solo quedan ' + remaining + ' ' + plural + '!';
+      el.innerHTML = '<span class="stock-dot"></span> ¡Últimas entradas — quedan ' + remaining + '!';
     } else {
       el.style.display = 'none';
     }
